@@ -4,7 +4,7 @@ set -eu
 cd "$(dirname "$0")/../.."
 mkdir -p build-out
 
-for t in fib fizzbuzz stackops; do
+for t in fib fizzbuzz stackops sierpinski; do
   golden="src/tests/golden/$t.out"
 
   # 1. interpreted via stage0

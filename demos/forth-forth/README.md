@@ -58,6 +58,12 @@ bash src/selfhost/check.sh    # self-hosting chain
 ../../evals/wfcheck .         # workflow-correctness score
 ```
 
+Post-build evolution: a 4th golden test (`src/tests/sierpinski.fs`, Sierpinski
+triangle via Lucas' theorem — no bitwise words in the dialect) was added by a
+live pi agent restricted to the single `forth` tool from
+`../../demoscene/forth-tool`; recording + trace in `../../demoscene/`
+(`session.cast`, `session-trace.jsonl`, `SESSION.md`).
+
 Artifacts: `buildlog.txt` (full engine run), `shots/` (progress, gate,
 selfhost fixed point, dep graph), `REVIEW.md` + `build/report.md` (reviewer),
 `build/wfscore.json`.

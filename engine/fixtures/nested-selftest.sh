@@ -13,6 +13,8 @@
 #   6. MAXFANOUT gate: plan wider than cap rejected, plan.json deleted
 #   7. MAXTIER clamp: stub prd classifier under MAXTIER=vague → vague row
 #   8. observability: wfcheck recursion, progress/graph subtree rendering
+#   9. id charset gate: metachar/traversal/non-kebab ids rejected (plan gate
+#      + subtree helper) — ids splice into make+shell, LLM = trust boundary
 set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)      # engine/fixtures
 ENGINE=$(cd "$DIR/.." && pwd)           # engine
@@ -151,4 +153,17 @@ jq -e '(.checks[] | select(.name=="subtree:comp") | .pass) and .subtrees.comp.sc
 grep -q 'sub-a.done'    <<<"$(make -s -C "$P" progress)" || fail "progress does not recurse into subtree"
 grep -q 'subgraph comp' <<<"$(make -s -C "$P" graph)"    || fail "graph missing subtree subgraph"
 
-echo "nested-selftest: PASS (tree build, order, idempotence, deep resume, bubble+resume, depth cap, fanout gate, tier clamp, wfcheck/progress/graph recursion)"
+# ── 9. id charset gate: hostile ids never reach the jq→makefile splice
+P5=$TMP/run5; mkproj "$P5"
+export MOCK_LOG="$TMP/mock5.log"
+for bad in 'evil; rm -rf .' '../escape' 'a b' 'UPPER' '$(AGENT)'; do
+  MOCK_BAD_ID="$bad" make -C "$P5" all > "$TMP/run5.log" 2>&1 \
+    && fail "plan gate accepted id: $bad"
+  [ ! -f "$P5/build/plan.json" ] || fail "plan.json survived id gate ($bad)"
+done
+# engine/subtree enforces the same boundary when invoked directly
+if (cd "$P5" && "$ENGINE/subtree" '../up') > /dev/null 2>&1; then
+  fail "subtree accepted traversal id"
+fi
+
+echo "nested-selftest: PASS (tree build, order, idempotence, deep resume, bubble+resume, depth cap, fanout gate, tier clamp, wfcheck/progress/graph recursion, id gate)"

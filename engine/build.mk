@@ -56,7 +56,7 @@ $(B)/effort.json: $(GOAL) | $(B)
 # ── Phase 1: decomposition (agent, no tools)
 $(B)/plan.json: $(GOAL) $(B)/effort.json
 	$(AGENT) plan $< > $@
-	jq -e --argjson maxf $(MAXFANOUT) '(.components | length > 0 and length <= $$maxf) and all(.components[]; (.kind // "leaf") == "leaf" or (.sub_goal | type=="string" and length > 0))' $@ > /dev/null   # gate: valid decomposition; composite ⇒ sub_goal; bounded fanout
+	jq -e --argjson maxf $(MAXFANOUT) 'def okid: type=="string" and test("^[a-z0-9][a-z0-9-]{0,63}$$"); (.components | length > 0 and length <= $$maxf) and all(.components[]; (.id|okid) and all(.deps[]?; okid) and ((.kind // "leaf") == "leaf" or (.sub_goal | type=="string" and length > 0)))' $@ > /dev/null   # gate: bounded fanout; composite ⇒ sub_goal; id/dep charset — ids splice into make targets + shell recipe lines via the jq template (LLM output = trust boundary)
 
 # ── Phase 2: plan generates the DAG — dep edges come from the agent
 # Fork per component kind (rfc-nested §3b): leaf → build agent; composite →

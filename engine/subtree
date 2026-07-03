@@ -6,6 +6,9 @@ set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)   # absolute engine dir — nested relative includes break at depth ≥ 2
 B=${B:-build} SRC=${SRC:-src}
 id=$1
+# trust boundary (same allowlist as build.mk plan gate): id becomes a path
+# component + shell arg — reject metachars/traversal even when called directly
+[[ $id =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || { echo "subtree: invalid id: $id" >&2; exit 1; }
 d=$SRC/$id
 mkdir -p "$d"
 

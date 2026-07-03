@@ -10,6 +10,7 @@
 # Knobs (env):
 #   MOCK_LOG      append-only call log (order/count assertions)
 #   MOCK_FAIL_ID  leaf id whose check.sh exits 1 (failure-bubble tests)
+#   MOCK_BAD_ID   emit single-component plan with this raw id (id-gate tests)
 set -euo pipefail
 B=${B:-build} SRC=${SRC:-src}
 log() { if [ -n "${MOCK_LOG:-}" ]; then echo "$*" >> "$MOCK_LOG"; fi; }
@@ -22,7 +23,9 @@ case $role in
     ;;
   plan)
     log "plan d=${AGENTMAKE_DEPTH:-?}"
-    if grep -q 'SUBTREE-GOAL' "$1"; then
+    if [ -n "${MOCK_BAD_ID:-}" ]; then
+      jq -cn --arg id "$MOCK_BAD_ID" '{components:[{id:$id,desc:"evil",deps:[]}]}'
+    elif grep -q 'SUBTREE-GOAL' "$1"; then
       echo '{"components":[{"id":"sub-a","desc":"sub leaf a","deps":[]},{"id":"sub-b","desc":"sub leaf b","deps":["sub-a"]},{"id":"sub-c","desc":"sub leaf c","deps":["sub-b"]}]}'
     else
       echo '{"components":[{"id":"leaf-one","desc":"leaf one","deps":[]},{"id":"leaf-two","desc":"leaf two","deps":["leaf-one"]},{"id":"comp","desc":"composite chunk; buildable as one unit if depth-capped","deps":["leaf-one"],"kind":"composite","sub_goal":"SUBTREE-GOAL: build sub-a, sub-b, sub-c as a dependency chain."}]}'

@@ -1,0 +1,103 @@
+mkdir -p build
+../../engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+../../engine/agent plan goal.md > build/plan.json
+jq -e '.components | length > 0' build/plan.json > /dev/null   # gate: valid decomposition
+jq -r '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n\t$(AGENT) build \(.id)\n\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+../../engine/agent build db-seed
+../../engine/agent build reverse-proxy
+Done. Component `db-seed` built, check passes.
+
+**Files:**
+- `src/db-seed/seed.py` — schema + seeder. `connect(path)` sets `journal_mode=WAL` + `busy_timeout=2000`; `seed(path)` creates table, inserts 8 tweets from 4 users via `INSERT OR IGNORE` with fixed ids → idempotent by construction. Fixed ts strings ("Jul 1", "2h", …), distinct per-user avatar colors, non-zero counts. CLI: `python3 seed.py <db-path>`. Importable by backend-server.
+- `src/db-seed/check.sh` — temp DB, seeds twice, asserts count stable + ≥8 rows, all 9 schema columns, WAL persisted, ≥4 users, distinct colors, non-zero counts, module `connect()` pragma values. Trap cleans temp dir.
+bash src/db-seed/check.sh
+OK: schema, WAL, busy_timeout, idempotent seed, 8 tweets / 4 users
+touch build/db-seed.done
+../../engine/agent build ui-page
+Done. Files under `src/reverse-proxy/`:
+
+- **proxy.py** — `proxy.py [listen_port] [backend_port ...]`, defaults `8080 -> 9101 9102 9103`. ThreadingHTTPServer; strict round-robin index + per-backend counters under one lock; forwards method/path/query/headers/body via `http.client`, returns response verbatim + `X-Backend`; strips hop-by-hop headers; `/lb-stats` answered locally `{"backends":[{port,requests}...],"total":N}`; connect failure → 502 JSON, counter untouched (rotation still advances). Port 0 supported, prints `PROXY_PORT=<n>` when ready.
+- **stub_backend.py** — test stub, echoes `{port,method,path,body}` JSON.
+- **check.sh** (executable) — bind-port-0 free ports, trap cleanup, verifies: 3-request rotation hits all 3 backends, `X-Backend` matches body, POST body/query/method forwarded, `/lb-stats` counts `2/1/1` total 4, kill middle backend → exactly one 502 with JSON error and dead counter frozen. Runs ~1s, exit 0.
+
+ponytail: proxy is HTTP/1.1 with buffered (non-streaming) bodies — fine for JSON/HTML payloads here; upgrade path is chunked streaming if large responses ever appear.
+bash src/reverse-proxy/check.sh
+OK: reverse-proxy checks passed
+touch build/reverse-proxy.done
+../../engine/agent build backend-server
+Done.
+
+**Files:**
+- `src/backend-server/server.py` — ThreadingHTTPServer; port via argv[1]/`PORT` (0 = auto, prints `BACKEND_PORT=` like sibling convention); DB via argv[2]/`DB_PATH`; imports `db-seed/seed.py` for WAL+busy_timeout `connect()`. Endpoints: `/api/health` `{ok,port}`, `/api/timeline` newest-first (id DESC) limit 50 exact F1 schema, `POST /api/tweets` 201 + tweet JSON, 400 on missing/empty/>280/bad JSON, `GET /` serves UI HTML (argv[3]/`UI_HTML`, default `../ui-page/index.html`, placeholder if absent since ui-page not built yet). Per-request sqlite connection — thread-safe with WAL.
+- `src/backend-server/check.sh` — seeds temp DB, boots on port 0, asserts health, timeline schema+order, 201 post + top-of-timeline, three 400 cases, `GET /` HTML; trap cleanup. Passes.
+
+ponytail: posted tweets hardcode author `you/You` + ts `"now"` — no auth in scope; upgrade path is payload fields if ever needed.
+bash src/backend-server/check.sh
+OK: backend-server checks passed
+touch build/backend-server.done
+../../engine/agent build load-stand
+Done. Files under `src/load-stand/`:
+
+- **`loadstand.py`** — stdlib load stand. `--requests` (300) / `--concurrency` (10) / `--url` (required). Fixed plan `i % 5 == 0` → exactly 20% POST `/api/tweets`, 80% GET `/api/timeline`. Threads pull indices from shared counter under lock, record per-request latency. Then fetches `/lb-stats`, prints per-backend counts + deviation, req/s, latency p50/p95. Exit 0 iff every backend `|count − mean|/mean ≤ 0.10`, else exit 2 (also fails on zero traffic).
+- **`check.sh`** — reuses sibling `reverse-proxy/proxy.py` + `stub_backend.py`. Boots 3 stubs + proxy on free ports (bind-0), asserts exit 0 + `BALANCE: OK` on balanced run; kills one backend (proxy's 502 path freezes its counter → forced skew), asserts nonzero exit + `BALANCE: FAIL`. Trap kills children, ~2s runtime.
+
+ponytail: skew forced via dead backend rather than weighted proxy — simplest lever given proxy's counter-skip-on-502 contract; upgrade path = dedicated skew stub if proxy semantics change.
+bash src/load-stand/check.sh
+OK: load-stand checks passed
+touch build/load-stand.done
+Done.
+
+- `src/ui-page/index.html` — single self-contained page. X dark theme (#000/#2f3336/#e7e9ea/#71767b/#1d9bf0, system-ui). Left rail: X logo + Home (active/bold), Explore, Notifications, Messages, Profile inline SVGs + blue Post button. Center 600px column: sticky "Home" header, compose box (avatar circle, "What's happening?" placeholder, Post button disabled until non-empty text), tweet cards with colored-initial avatars, `name @handle · ts` line, reply/retweet/like/views SVG action row with K/M count formatting. Right column: search pill + "What's happening" trends card. JS: `fetch("/api/timeline")` render (ts strings used verbatim), `POST /api/tweets` then re-render, text HTML-escaped. No animations, no autofocus, zero external URLs.
+- `src/ui-page/check.sh` — static asserts: no `http(s)://` refs, all 5 required hex colors, system-ui, layout markers (nav-rail/home-header/compose/tweet-actions/search-pill/nav labels/600px/disabled), both fetch calls, no animation/autofocus. Passes.
+
+ponytail: views count derived from engagement (`(replies+retweets+likes)*7`) — schema has no views field; deterministic, upgrade path is adding a column in db-seed.
+bash src/ui-page/check.sh
+OK: ui-page checks passed
+touch build/ui-page.done
+../../engine/agent build run-harness
+Done. Files under `src/run-harness/`:
+
+**run.sh** — seeds temp DB (`DB_PATH` overridable), boots 3 backends (`B1`/`B2`/`B3`, default 9101/9102/9103) + proxy (`PROXY_PORT`, default 8080), waits all 4 healthy within 5s (direct backend health + proxy `/lb-stats`, neither touching LB counters), prints URLs, `trap`-kills children on EXIT/INT/TERM. `--check` mode:
+
+- A1: 3 consecutive `/api/health` via proxy → 3 distinct ports
+- A2: timeline schema exact + newest-first, ≥8 seeded tweets
+- A3: POST via proxy, then reads timeline until `X-Backend` differs from posting backend and tweet text present
+- A4: `/lb-stats` total delta == 9 after 9 forwarded requests, then load-stand 300 req (its own 10%-of-mean exit code)
+- A5: `GET /` has zero `http(s)://` refs, contains `nav-rail`/`compose`/`tweet` markers
+
+**check.sh** — grabs 4 free ports via bind-port-0, `exec ./run.sh --check`.
+
+Verified: check passes in ~1.5s, two concurrent checks pass (make -j2 safe), TERM releases all ports. `ponytail:` free-port allocation closes sockets before reuse (tiny race window); upgrade path is passing port 0 through to servers and parsing their `BACKEND_PORT=`/`PROXY_PORT=` stdout lines.
+bash src/run-harness/check.sh
+A1 OK: round-robin ports 63654 63655 63656
+A2 OK: timeline schema newest-first
+A3 OK: WAL shared state (posted via 63655, read via 63656)
+requests=300 concurrency=10 elapsed=0.22s
+req/s=1338.7
+latency p50=4.2ms p95=8.8ms
+backend 63654: requests=105 deviation=0.0%
+backend 63655: requests=105 deviation=0.0%
+backend 63656: requests=105 deviation=0.0%
+total=315 mean=105.0
+BALANCE: OK (all backends within 10% of mean)
+A4 OK: lb-stats total + balance
+A5 OK: self-contained UI with nav rail/compose/cards
+ALL CHECKS PASSED
+touch build/run-harness.done
+../../engine/agent build visual-eval
+Done. Files under `src/visual-eval/`:
+
+- **`eval.sh`** — boots stack via `../run-harness/run.sh` on 4 free ports (bind-0 trick), waits health ≤10s, snaps `/` at 1280×800 via `../../evals/snap` (retries ×3 — JS timeline fetch can race the shot), runs structural pixel check, then `evalshot` vs `golden.png` @ 0.97 SSIM. Trap kills harness (its own trap kills children) + rm tmp. On fail copies shot to `last-fail.png`.
+- **`checkpixels.py`** — decodes PNG via ffmpeg rawvideo (ffmpeg already required by evalshot), asserts: mean luminance < 48 (dark bg), bright text + blue Post button in nav rail region, blue Post button in center-column compose area, ≥4 avatar color blobs in avatar strip (compose + ≥3 tweet cards). Found 8 blobs on real shot, all-fail on blank black.
+- **`check.sh`** — `exec ./eval.sh`, non-interactive, runs in ~0.8s.
+- **`golden.png`** — bootstrapped, visually reviewed (correct X dark layout), stable SSIM=1.0 across reruns.
+
+ponytail: geometry constants (260px rail / 600px column) mirror ui-page CSS; if layout widths change, update `checkpixels.py` offsets + re-bootstrap golden (`rm golden.png`).
+bash src/visual-eval/check.sh
+checkpixels: PASS dark bg, nav rail, compose, 8 avatar blobs (>=3 tweet cards)
+evalshot: PASS ssim=1.000000 >= 0.97  (/var/folders/xs/c5csb0t50mbc4wfhfh6yrqdr0000gn/T/tmp.BnpUaXy4Hu/shot.png vs ./golden.png)
+A6 OK: visual eval passed
+touch build/visual-eval.done
+../../engine/agent review > build/report.md
+grep -q 'VERDICT: PASS' build/report.md

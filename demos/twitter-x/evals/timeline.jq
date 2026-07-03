@@ -1,0 +1,1 @@
+{seed_tweets: (.tweets | map(select(.id <= 8)) | sort_by(.id) | map({id, handle, name, text, ts, replies, retweets, likes})), newest_first: (.tweets | map(.id) | . == (sort | reverse)), le_limit: (.tweets|length <= 50)}

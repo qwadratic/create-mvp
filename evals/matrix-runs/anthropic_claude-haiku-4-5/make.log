@@ -1,0 +1,128 @@
+mkdir -p build
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent plan goal.md > build/plan.json
+jq -e '.components | length > 0' build/plan.json > /dev/null   # gate: valid decomposition
+jq -r '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n\t$(AGENT) build \(.id)\n\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build word-counter
+Component implemented. Files under `src/word-counter/`:
+
+**counter.py** — Core module with dual interface:
+- `count_words(text)` → `{word: count}` dict (importable by sibling components)
+- `main()` reads stdin, outputs JSON (CLI-callable)
+- Lowercases, splits on `[^a-z]`, counts occurrences
+- JSON output has `sort_keys=True` for determinism
+
+**check.sh** — Self-test, 5 cases:
+1. Basic counting + case-insensitivity
+2. Non-letter splitting (punctuation, underscores)
+3. Empty input → `{}`
+4. Only non-letters → `{}`
+5. Numbers as delimiters
+
+All tests pass. Component ready for json-formatter + cli-interface integration.
+bash src/word-counter/check.sh
+Test 1: Basic word counting
+✓ Test 1 passed
+Test 2: Non-letter splitting
+✓ Test 2 passed
+Test 3: Empty input
+✓ Test 3 passed
+Test 4: Only non-letters
+✓ Test 4 passed
+Test 5: Numbers as delimiters
+✓ Test 5 passed
+
+All tests passed!
+touch build/word-counter.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build json-formatter
+Done. Component `json-formatter` implemented.
+
+**Files created:**
+- `src/json-formatter/formatter.py` — Converts word-count dict to sorted JSON array
+- `src/json-formatter/check.sh` — Self-test (6 test cases, all passing)
+
+**Key behavior:**
+- Reads JSON dict from stdin: `{"word": count, ...}`
+- Sorts by count descending, then word ascending (alphabetical)
+- Outputs compact JSON (no spaces): `[{"word":"...", "count":...}, ...]`
+- Deterministic: same input → byte-identical output
+- Integration verified: pipes cleanly from word-counter
+
+Test results: All 6 tests pass (sorting, compactness, determinism, edge cases).
+bash src/json-formatter/check.sh
+Test 1: Basic sorting (count desc, word asc)...
+  PASS
+Test 2: Compact JSON (no spaces)...
+  PASS
+Test 3: Determinism...
+  PASS
+Test 4: Empty dict...
+  PASS
+Test 5: Single entry...
+  PASS
+Test 6: Word order for same count (alphabetical asc)...
+  PASS
+
+All tests passed!
+touch build/json-formatter.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build cli-interface
+Done. Component `cli-interface` created:
+
+**Files:**
+- `src/cli-interface/wordfreq.py` — entry point. Parses `--top N` (default 5), orchestrates pipeline: stdin → word-counter → json-formatter → slice top-N → compact JSON output
+- `src/cli-interface/check.sh` — 10 tests covering: CLI parsing, slicing, determinism, tie-breaking, compact JSON, empty input, non-letter splitting, case-insensitivity
+
+**Tests:** All 10 pass. Validates:
+- Default `--top 5` and custom `--top N` 
+- Sorting: count desc, word asc for ties
+- Edge cases: `--top 0`, N > result count, empty input
+- Deterministic byte-identical output (no spaces, consistent JSON format)
+
+Uses stdlib only (subprocess, json, argparse, os). Integrates with sibling components via subprocess calls.
+bash src/cli-interface/check.sh
+Test 1: Default --top 5 (implicit)
+  PASS
+Test 2: Explicit --top 2
+  PASS
+Test 3: Slicing when N > results
+  PASS
+Test 4: --top 0 returns empty array
+  PASS
+Test 5: Determinism (same input -> same output)
+  PASS
+Test 6: Sorting by count desc, word asc (tie-breaking)
+  PASS
+Test 7: Compact JSON (no spaces)
+  PASS
+Test 8: Empty input
+  PASS
+Test 9: Non-letter splitting (numbers, punctuation)
+  PASS
+Test 10: Case insensitivity
+  PASS
+
+All tests passed!
+touch build/cli-interface.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build golden-test
+Done. Golden-test component:
+
+**Files created:**
+- `src/golden-test/input.txt` — fixed test corpus with varied word frequencies
+- `src/golden-test/golden.json` — expected output (canonical JSON from `jq -S`)
+- `src/golden-test/check.sh` — executable self-test (exits 0 on pass)
+
+**How it works:**
+1. Reads input.txt into cli-interface/wordfreq.py
+2. Pipes output through `jq -S .` for canonical (sorted-key, deterministic) form
+3. Byte-compares result against golden.json
+4. Exits 0 on match, non-zero with diffs on failure
+
+Tested: ✓ passes, runs instantly, no external deps beyond jq (already on system).
+bash src/golden-test/check.sh
+PASS: Golden test - output byte-identical with golden.json
+touch build/golden-test.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent review > build/report.md
+grep -q 'VERDICT: PASS' build/report.md
+make: *** [build/report.md] Error 1
+make: *** Deleting file `build/report.md'

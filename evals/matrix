@@ -1,0 +1,129 @@
+#!/usr/bin/env bash
+# matrix [provider/model ...] — multi-model eval: same fixed goal through the
+# engine per model; collect wfcheck score, wall time, tokens/cost (from pi
+# session files). Writes evals/matrix-results.md.
+#
+# Default models span tiers (small / frontier-mid / other-provider); each is
+# verified against `pi --list-models` and probed with a trivial call — models
+# without working keys are skipped, not failed.
+# Overrides: RUN_TIMEOUT=900 (seconds per model run), JOBS=2 (make -j).
+set -uo pipefail
+
+DIR=$(cd "$(dirname "$0")" && pwd)                 # evals/
+ROOT=$(cd "$DIR/.." && pwd)
+REPORT_ONLY=
+if [ "${1:-}" = --report-only ]; then REPORT_ONLY=1; shift; fi
+MODELS=("${@:-}")
+[ -n "${MODELS[0]:-}" ] || MODELS=(anthropic/claude-haiku-4-5 anthropic/claude-sonnet-4-6 google/gemini-flash-latest)
+RUN_TIMEOUT=${RUN_TIMEOUT:-900} JOBS=${JOBS:-2}
+RUNS=$DIR/matrix-runs
+RESULTS=$DIR/matrix-results.md
+
+command -v pi >/dev/null && command -v jq >/dev/null || { echo "matrix: need pi + jq" >&2; exit 2; }
+
+# ── discover: keep only models pi knows AND that answer a trivial probe
+live=()
+if [ -n "$REPORT_ONLY" ]; then
+  for d in "$RUNS"/*/; do [ -d "$d" ] && { s=$(basename "$d"); live+=("${s/_//}"); }; done   # slug: first _ = provider sep
+  [ ${#live[@]} -gt 0 ] || { echo "matrix: --report-only but no runs in $RUNS" >&2; exit 1; }
+else
+known=$(pi --list-models 2>/dev/null | awk 'NF>=2 {print $1"/"$2}')
+for m in "${MODELS[@]}"; do
+  grep -qx "$m" <<<"$known" || { echo "matrix: skip $m (not in pi --list-models)" >&2; continue; }
+  if timeout 60 pi -p --no-session --no-context-files --no-skills --no-extensions --no-tools \
+       --model "$m" "reply with exactly: ok" >/dev/null 2>&1; then
+    live+=("$m")
+  else
+    echo "matrix: skip $m (probe failed — no key?)" >&2
+  fi
+done
+[ ${#live[@]} -ge 2 ] || { echo "matrix: need >=2 live models, got ${#live[@]}" >&2; exit 1; }
+fi
+
+# ── fixed goal: small, measurable, jq-checkable
+goal() { cat <<'EOF'
+# Goal
+`wordfreq` — word-frequency CLI.
+
+- `wordfreq.py`: reads text from stdin, prints a JSON array of the top-N most
+  frequent words: `[{"word": "...", "count": N}, ...]`, sorted by count desc,
+  then word asc for ties. N from `--top N` (default 5). Words = lowercased,
+  split on any non-letter character.
+- Deterministic: same input -> byte-identical output (jq-diffable).
+- Include a golden test: fixed input file + expected JSON output file, compared
+  via jq in the check.
+- python3 stdlib only; no pip, no docker, no network.
+EOF
+}
+
+run_model() {  # run_model <provider/model>
+  local m=$1 slug run rc=0
+  slug=${m//\//_}
+  run=$RUNS/$slug
+  rm -rf "$run" && mkdir -p "$run/.sessions"
+  goal > "$run/goal.md"
+  printf 'GOAL ?= goal.md\ninclude %s/engine/build.mk\n' "$ROOT" > "$run/Makefile"
+
+  local t0 t1
+  t0=$(date +%s)
+  # ENGINE_CLI_FLAGS appended last in engine/agent -> pins model over effort knobs;
+  # PI_SESSION_DIR keeps session jsonl for token/cost accounting.
+  ENGINE_CLI_FLAGS="--model $m" PI_SESSION_DIR=$run/.sessions \
+    timeout "$RUN_TIMEOUT" make -C "$run" -j"$JOBS" all > "$run/make.log" 2>&1 || rc=$?
+  t1=$(date +%s)
+  echo "$rc" > "$run/make.rc"
+  echo $((t1 - t0)) > "$run/wall.s"
+
+  "$DIR/wfcheck" "$run" > "$run/wfcheck.log" 2>&1 || true   # score lands in build/wfscore.json
+
+  # tokens/cost: sum usage objects across session jsonl (per-call input recount = billed reality)
+  cat "$run/.sessions"/*.jsonl 2>/dev/null \
+    | jq -s '[.. | objects | select(has("totalTokens"))]
+             | {tokens: ([.[].totalTokens] | add // 0),
+                cost:   (([.[].cost.total? // 0] | add // 0) * 10000 | round / 10000)}' \
+    > "$run/usage.json" || echo '{"tokens":0,"cost":0}' > "$run/usage.json"
+}
+
+if [ -z "$REPORT_ONLY" ]; then
+  for m in "${live[@]}"; do
+    echo "matrix: running $m ..." >&2
+    run_model "$m" &
+  done
+  wait
+fi
+
+# ── report
+{
+  echo "# Multi-model matrix — same goal, same engine, same gates"
+  echo
+  echo "Goal: \`wordfreq\` CLI (see \`matrix-runs/*/goal.md\`). Engine: \`engine/build.mk\` +"
+  echo "\`engine/agent\`, model pinned via \`ENGINE_CLI_FLAGS=--model …\`, tokens/cost from pi"
+  echo "session files (\`PI_SESSION_DIR\`). Score: \`evals/wfcheck\` (plan schema, DAG,"
+  echo "src+check.sh, check re-runs, census, review verdict). \`make\` != ok means a gate"
+  echo "rejected honestly (\`.DELETE_ON_ERROR\` discards the artifact) — see \`make.log\`."
+  echo
+  echo "| model | wfcheck | score | make | wall (s) | components | tokens | cost (USD) |"
+  echo "|---|---|---|---|---|---|---|---|"
+  for m in "${live[@]}"; do
+    slug=${m//\//_}; run=$RUNS/$slug
+    ws=$run/build/wfscore.json
+    if [ -f "$ws" ]; then
+      passed=$(jq -r .passed "$ws"); total=$(jq -r .total "$ws"); score=$(jq -r .score "$ws")
+    else
+      passed=0 total=? score=0
+    fi
+    rc=$(cat "$run/make.rc" 2>/dev/null || echo '?')
+    [ "$rc" = 0 ] && mk=ok || mk="exit $rc"
+    wall=$(cat "$run/wall.s" 2>/dev/null || echo '?')
+    comp=$(jq -r '.components | length' "$run/build/plan.json" 2>/dev/null || echo '?')
+    tokens=$(jq -r .tokens "$run/usage.json" 2>/dev/null || echo '?')
+    cost=$(jq -r .cost "$run/usage.json" 2>/dev/null || echo '?')
+    echo "| $m | $passed/$total | $score | $mk | $wall | $comp | $tokens | $cost |"
+  done
+  echo
+  echo "_Generated by \`evals/matrix\` on $(date '+%Y-%m-%d %H:%M %Z'). Wall times are"
+  echo "single-run, models executed in parallel on one host — trend, not benchmark._"
+} > "$RESULTS"
+
+echo "matrix: done — $RESULTS"
+cat "$RESULTS"

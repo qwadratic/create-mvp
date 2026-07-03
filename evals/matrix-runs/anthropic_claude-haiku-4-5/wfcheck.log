@@ -1,0 +1,2 @@
+wfcheck: FAIL 19/20 checks (score 0.95) — /Users/gerhardgustav/Desktop/hobby-dev/agentmake/evals/matrix-runs/anthropic_claude-haiku-4-5
+  ✗ review-verdict: build/report.md missing or no 'VERDICT: PASS' line

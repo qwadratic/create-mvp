@@ -1,0 +1,122 @@
+#!/usr/bin/env bash
+# wfcheck <project-dir> — workflow-correctness eval for an agentmake engine run.
+# Measures: plan schema, DAG validity, per-component src + check.sh presence,
+# check.sh re-runs (exit 0), census (.done stamps), review VERDICT: PASS.
+# Emits <project>/build/wfscore.json {checks:[{name,pass,detail}],passed,total,score}
+# + one human line. Exit 0 iff every check passed.
+# Overrides: B=build SRC=src CHECK_TIMEOUT=90 (seconds per check.sh).
+set -uo pipefail
+
+[ $# -eq 1 ] || { echo "usage: wfcheck <project-dir>" >&2; exit 2; }
+proj=$1
+[ -d "$proj" ] || { echo "wfcheck: no such dir: $proj" >&2; exit 2; }
+command -v jq >/dev/null || { echo "wfcheck: jq not found" >&2; exit 2; }
+B=${B:-build} SRC=${SRC:-src} CHECK_TIMEOUT=${CHECK_TIMEOUT:-90}
+cd "$proj"
+plan=$B/plan.json
+
+results=$(mktemp)
+trap 'rm -f "$results"' EXIT
+record() {  # record <name> <pass:0|1> <detail>
+  jq -n --arg n "$1" --argjson p "$([ "$2" = 1 ] && echo true || echo false)" --arg d "$3" \
+    '{name:$n, pass:$p, detail:$d}' >> "$results"
+}
+
+# ── plan gates
+if jq -e . "$plan" >/dev/null 2>&1; then
+  record plan-exists 1 "$plan parses"
+else
+  record plan-exists 0 "$plan missing or invalid JSON"
+fi
+
+if jq -e '(.components | type=="array" and length>0) and
+          all(.components[]; (.id|type=="string" and length>0) and
+                             (.desc|type=="string" and length>0) and
+                             (.deps|type=="array"))' "$plan" >/dev/null 2>&1; then
+  record plan-schema 1 "components[] each have id/desc/deps"
+else
+  record plan-schema 0 "schema violation (need non-empty components[] with id,desc,deps)"
+fi
+
+# ── DAG: deps reference known ids, no cycles (python3 stdlib toposort)
+dag_err=$(python3 - "$plan" 2>&1 <<'EOF'
+import json, sys
+try:
+    comps = json.load(open(sys.argv[1]))["components"]
+except Exception as e:
+    sys.exit(f"unreadable plan: {e}")
+ids = [c["id"] for c in comps]
+if len(ids) != len(set(ids)): sys.exit("duplicate component ids")
+deps = {c["id"]: list(c.get("deps") or []) for c in comps}
+unknown = [d for ds in deps.values() for d in ds if d not in deps]
+if unknown: sys.exit(f"deps reference unknown ids: {unknown}")
+seen, done = set(), set()
+def visit(n):
+    if n in done: return
+    if n in seen: sys.exit(f"cycle through '{n}'")
+    seen.add(n)
+    for d in deps[n]: visit(d)
+    done.add(n)
+for n in deps: visit(n)
+EOF
+)
+if [ -z "$dag_err" ]; then
+  record dag-valid 1 "deps acyclic, all ids resolve"
+else
+  record dag-valid 0 "$dag_err"
+fi
+
+# ── per-component gates
+TIMEOUT=(); command -v timeout >/dev/null && TIMEOUT=(timeout "$CHECK_TIMEOUT")
+for id in $(jq -r '.components[]?.id // empty' "$plan" 2>/dev/null); do
+  if [ -d "$SRC/$id" ] && [ -n "$(ls -A "$SRC/$id" 2>/dev/null)" ]; then
+    record "src:$id" 1 "$SRC/$id non-empty"
+  else
+    record "src:$id" 0 "$SRC/$id missing or empty"
+  fi
+
+  chk=$SRC/$id/check.sh
+  if [ -x "$chk" ]; then
+    record "checksh:$id" 1 "$chk executable"
+  else
+    record "checksh:$id" 0 "$chk missing or not executable"
+  fi
+
+  if [ -f "$chk" ]; then
+    if out=$("${TIMEOUT[@]}" bash "$chk" 2>&1); then
+      record "run:$id" 1 "check.sh exit 0"
+    else
+      record "run:$id" 0 "check.sh exit $? — $(tail -c 200 <<<"$out" | tr '\n' ' ')"
+    fi
+  else
+    record "run:$id" 0 "no check.sh to run"
+  fi
+
+  if [ -f "$B/$id.done" ]; then
+    record "done:$id" 1 "$B/$id.done present"
+  else
+    record "done:$id" 0 "$B/$id.done missing — census incomplete"
+  fi
+done
+
+# ── review gate
+if grep -q '^VERDICT: PASS$' "$B/report.md" 2>/dev/null; then
+  record review-verdict 1 "$B/report.md has VERDICT: PASS"
+else
+  record review-verdict 0 "$B/report.md missing or no 'VERDICT: PASS' line"
+fi
+
+# ── assemble score
+mkdir -p "$B"
+jq -s '{checks:., passed:(map(select(.pass))|length), total:length}
+       | .score = ((.passed/.total*100|round)/100)' "$results" > "$B/wfscore.json"
+
+passed=$(jq -r .passed "$B/wfscore.json") total=$(jq -r .total "$B/wfscore.json")
+score=$(jq -r .score "$B/wfscore.json")
+if [ "$passed" = "$total" ]; then
+  echo "wfcheck: PASS $passed/$total checks (score $score) — $proj"
+else
+  echo "wfcheck: FAIL $passed/$total checks (score $score) — $proj" >&2
+  jq -r '.checks[] | select(.pass|not) | "  ✗ \(.name): \(.detail)"' "$B/wfscore.json" >&2
+  exit 1
+fi

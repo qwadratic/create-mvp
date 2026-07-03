@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+# wfcheck-selftest — expects PASS on known-good engine run, FAIL on broken copies.
+# Known-good reference: makefile-lab/twitter (prior art, complete run committed).
+set -euo pipefail
+DIR=$(cd "$(dirname "$0")/.." && pwd)   # evals/
+REF=${REF:-/Users/gerhardgustav/Desktop/hobby-dev/avax/makefile-lab/twitter}
+[ -d "$REF" ] || { echo "wfcheck-selftest: SKIP — reference run not found: $REF" >&2; exit 0; }
+
+TMP=$(mktemp -d)
+trap 'rm -rf "$TMP"' EXIT
+fail() { echo "wfcheck-selftest: FAIL — $1" >&2; exit 1; }
+
+# work on a copy: keep prior art pristine (wfcheck writes build/wfscore.json)
+cp -R "$REF" "$TMP/good"
+
+# 1. known-good run passes, score 1
+"$DIR/wfcheck" "$TMP/good" || fail "known-good run did not pass"
+jq -e '.score == 1 and .passed == .total' "$TMP/good/build/wfscore.json" >/dev/null \
+  || fail "good run score != 1"
+
+# 2. broken: missing .done stamp (census incomplete)
+cp -R "$REF" "$TMP/broken-census"
+rm "$TMP/broken-census/build/web-ui.done"
+"$DIR/wfcheck" "$TMP/broken-census" >/dev/null 2>&1 && fail "missing .done not caught"
+jq -e '.checks[] | select(.name=="done:web-ui") | .pass == false' \
+  "$TMP/broken-census/build/wfscore.json" >/dev/null || fail "wrong check blamed for census"
+
+# 3. broken: cyclic deps in plan
+cp -R "$REF" "$TMP/broken-dag"
+jq '.components[0].deps = ["http-api"] | .components[1].deps = ["db-layer"]' \
+  "$REF/build/plan.json" > "$TMP/broken-dag/build/plan.json"
+"$DIR/wfcheck" "$TMP/broken-dag" >/dev/null 2>&1 && fail "dep cycle not caught"
+jq -e '.checks[] | select(.name=="dag-valid") | .pass == false' \
+  "$TMP/broken-dag/build/wfscore.json" >/dev/null || fail "cycle not blamed on dag-valid"
+
+# 4. broken: failing check.sh + missing verdict
+cp -R "$REF" "$TMP/broken-gates"
+printf '#!/bin/bash\nexit 1\n' > "$TMP/broken-gates/src/web-ui/check.sh"
+sed -i '' 's/VERDICT: PASS/VERDICT: FAIL/' "$TMP/broken-gates/build/report.md"
+"$DIR/wfcheck" "$TMP/broken-gates" >/dev/null 2>&1 && fail "failing gates not caught"
+jq -e '([.checks[] | select(.name=="run:web-ui" or .name=="review-verdict") | .pass] | all(. == false))' \
+  "$TMP/broken-gates/build/wfscore.json" >/dev/null || fail "run/verdict checks not blamed"
+
+echo "wfcheck-selftest: PASS (good=pass; census, dag-cycle, gate/verdict breaks all caught)"

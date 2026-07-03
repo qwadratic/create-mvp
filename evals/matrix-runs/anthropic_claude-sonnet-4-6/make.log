@@ -1,0 +1,77 @@
+mkdir -p build
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent plan goal.md > build/plan.json
+jq -e '.components | length > 0' build/plan.json > /dev/null   # gate: valid decomposition
+jq -r '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n\t$(AGENT) build \(.id)\n\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build word-tokenizer
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build json-serializer
+Done. Files:
+
+- `src/word-tokenizer/tokenizer.py` — `tokenize(text)` splits on `[^a-zA-Z]+`, lowercases, filters empty strings. Self-test inline.
+- `src/word-tokenizer/check.sh` — runs the self-test, exits 0.
+bash src/word-tokenizer/check.sh
+ok
+touch build/word-tokenizer.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build golden-input-fixture
+Done. Two files under `src/json-serializer/`:
+
+- **`json_serializer.py`** — `serialize()` pure function wrapping `json.dumps(sort_keys=True, separators=(',',':'))`.
+- **`check.sh`** — runs the self-test assert, exits 0.
+bash src/json-serializer/check.sh
+ok
+touch build/json-serializer.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build frequency-counter
+Done. Files:
+
+- `src/frequency-counter/frequency_counter.py` — `top_n(words, n)` using `Counter` + `sorted(key=(-count, word))`
+- `src/frequency-counter/check.sh` — runs the self-test, exits 0
+bash src/frequency-counter/check.sh
+ok
+touch build/frequency-counter.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build cli-entrypoint
+Done. Files:
+
+- `src/golden-input-fixture/tests/input.txt` — 51-word prose, deliberate ties: `cat`/`hat` both at 5, `and`/`flat`/`red` all at 3
+- `src/golden-input-fixture/check.sh` — verifies file exists + non-empty, exits 0
+
+Top-5 counts (for downstream `golden-output-fixture` reference):
+| rank | word | count |
+|------|------|-------|
+| 1 | the | 15 |
+| 2 | mat | 6 |
+| 3 | cat | 5 | ← tie (cat < hat alpha)
+| 4 | hat | 5 |
+| 5 | and | 3 | ← three-way tie (and < flat < red)
+bash src/golden-input-fixture/check.sh
+OK: tests/input.txt exists and is non-empty
+touch build/golden-input-fixture.done
+Done. Files:
+
+- `src/cli-entrypoint/wordfreq.py` — argparse (`--top N`, default 5), reads stdin, pipes through `tokenize` → `top_n` → `serialize`, prints result.
+- `src/cli-entrypoint/check.sh` — 3 assertions (top-1 winner + count, default top-5 ranking, empty input), exits 0.
+bash src/cli-entrypoint/check.sh
+test1 ok
+test2 ok
+test3 ok
+all checks passed
+touch build/cli-entrypoint.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build golden-output-fixture
+Done. Files created:
+
+- `src/golden-output-fixture/tests/expected.json` — actual output of `wordfreq.py --top 5 < input.txt`, captured directly from the CLI.
+- `src/golden-output-fixture/check.sh` — runs `jq '.' expected.json`, exits 0 on valid JSON.
+bash src/golden-output-fixture/check.sh
+OK: tests/expected.json is valid JSON
+touch build/golden-output-fixture.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build golden-test-runner
+Done. `src/golden-test-runner/tests/check.sh` exits 0.
+
+Script logic:
+- Resolves all sibling component paths from `SCRIPT_DIR` → repo root
+- Runs `python3 wordfreq.py --top 5 < input.txt`, captures stdout
+- Applies `jq -c 'sort_by(.count)'` to both actual and expected
+- String-compares; prints PASS/FAIL with diff on mismatch, exits accordingly
+bash src/golden-test-runner/check.sh
+bash: src/golden-test-runner/check.sh: No such file or directory
+make: *** [build/golden-test-runner.done] Error 127

@@ -68,8 +68,10 @@ run() {  # run <unit> <tools:yes|no> <prompt>
   local cmd ce
   case $ENGINE_CLI in
     pi)
-      cmd=(pi -p --no-session --no-context-files --no-skills --no-prompt-templates
+      cmd=(pi -p --no-context-files --no-skills --no-prompt-templates
            --no-extensions --append-system-prompt "$DIR/prompts/system.md")
+      # PI_SESSION_DIR set -> keep sessions (token/cost accounting, evals/matrix); else ephemeral
+      if [ -n "${PI_SESSION_DIR:-}" ]; then cmd+=(--session-dir "$PI_SESSION_DIR"); else cmd+=(--no-session); fi
       [ "$tools" = no ] && cmd+=(--no-tools)
       [ -n "$MODEL" ] && cmd+=(--model "$MODEL")
       [ -n "$THINKING" ] && cmd+=(--thinking "$THINKING")

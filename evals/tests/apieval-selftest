@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# apieval-selftest — spins tiny stdlib http server, exercises seed/pass/fail paths.
+set -euo pipefail
+DIR=$(cd "$(dirname "$0")/.." && pwd)   # evals/
+TMP=$(mktemp -d)
+SRV_PID=
+cleanup() { [ -n "$SRV_PID" ] && { kill "$SRV_PID"; wait "$SRV_PID"; } 2>/dev/null || true; rm -rf "$TMP"; }
+trap cleanup EXIT
+
+# ── fixture: dense uniform JSON (TOON sweet spot)
+cat > "$TMP/users.json" <<'EOF'
+{"meta":{"generated_at":"2026-07-03T12:00:00Z","request_id":"abc123"},
+ "users":[
+   {"id":3,"name":"carol","role":"admin","last_seen":"2026-07-03T11:59:59Z"},
+   {"id":1,"name":"alice","role":"user","last_seen":"2026-07-02T09:00:00Z"},
+   {"id":2,"name":"bob","role":"user","last_seen":"2026-07-01T08:00:00Z"}]}
+EOF
+
+# query: strip volatile fields (meta, last_seen), stable sort
+cat > "$TMP/query.jq" <<'EOF'
+{users: [.users[] | {id, name, role}] | sort_by(.id)}
+EOF
+
+# ── stdlib http server on ephemeral port (prints chosen port)
+python3 -c '
+import http.server, socketserver, sys, os
+os.chdir(sys.argv[1])
+socketserver.TCPServer.allow_reuse_address = True
+srv = socketserver.TCPServer(("127.0.0.1", 0), http.server.SimpleHTTPRequestHandler)
+print(srv.server_address[1], flush=True)
+srv.serve_forever()
+' "$TMP" > "$TMP/port" 2>/dev/null &
+SRV_PID=$!
+for _ in $(seq 1 50); do [ -s "$TMP/port" ] && break; sleep 0.1; done
+PORT=$(cat "$TMP/port")
+URL="http://127.0.0.1:$PORT/users.json"
+GOLDEN="$TMP/users.golden.toon"
+
+fail() { echo "apieval-selftest: FAIL — $1" >&2; exit 1; }
+
+# 1. first run seeds golden, exits 0, loud NOTE
+out=$("$DIR/apieval" "$URL" "$TMP/query.jq" "$GOLDEN" 2>&1) || fail "seed run exited nonzero"
+grep -q 'GOLDEN SEEDED' <<<"$out" || fail "seed run missing NOTE"
+[ -s "$GOLDEN" ] || fail "golden not written"
+grep -q 'users\[3\]{id,name,role}' "$GOLDEN" || fail "golden not tabular TOON: $(cat "$GOLDEN")"
+
+# 2. second run passes against golden
+"$DIR/apieval" "$URL" "$TMP/query.jq" "$GOLDEN" >/dev/null || fail "clean rerun did not pass"
+
+# 3. mutate API response -> must fail
+sed -i '' 's/carol/mallory/' "$TMP/users.json"
+if "$DIR/apieval" "$URL" "$TMP/query.jq" "$GOLDEN" >/dev/null 2>&1; then
+  fail "mutated response passed — golden gate broken"
+fi
+
+# 4. golden round-trips back to JSON
+toon -d "$GOLDEN" | jq -e '.users | length == 3' >/dev/null || fail "golden does not decode to JSON"
+
+echo "apieval-selftest: PASS (seed, pass, fail-on-drift, toon round-trip)"

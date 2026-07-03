@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# apieval — API golden eval: curl -> jq reshape -> TOON encode -> diff vs golden.
+# usage: apieval <url> <query.jq> <golden.toon>
+# exit 0 = pass (or golden seeded on first run), 1 = fail, 2 = usage/env error.
+#
+# Why TOON goldens: token-cheap for agents reading dense JSON (uniform arrays
+# declare keys once, then bare rows) and line-diffs stay humanly readable.
+# jq -S sorts keys -> key-order-insensitive; strip volatile fields in query.jq
+# (see evals/docs/EVAL-PATTERNS.md §3).
+set -euo pipefail
+
+usage() { echo "usage: apieval <url> <query.jq> <golden.toon>" >&2; exit 2; }
+[ $# -eq 3 ] || usage
+url=$1 query=$2 golden=$3
+
+for t in curl jq toon; do
+  command -v "$t" >/dev/null || { echo "apieval: $t not found" >&2; exit 2; }
+done
+[ -f "$query" ] || { echo "apieval: no such query file: $query" >&2; exit 2; }
+
+# fetch + reshape + encode. -f: HTTP errors fail loudly; -sS: quiet but keep errors.
+body=$(curl -sfS "$url") || { echo "apieval: fetch failed: $url" >&2; exit 1; }
+actual=$(printf '%s' "$body" | jq -S -f "$query" | toon) \
+  || { echo "apieval: jq/toon pipeline failed (bad JSON or query?)" >&2; exit 1; }
+
+# ── first run: seed golden, loud NOTE, auto-pass (same protocol as evalshot)
+if [ ! -f "$golden" ]; then
+  mkdir -p "$(dirname "$golden")"
+  printf '%s\n' "$actual" > "$golden"
+  cat >&2 <<EOF
+##################################################################
+# NOTE: GOLDEN SEEDED — did not exist, wrote current API response #
+#   golden: $golden
+# This run auto-PASSES. Review the TOON manually, then commit it. #
+# If response was wrong: rm golden, fix API, rerun to re-seed.    #
+##################################################################
+EOF
+  exit 0
+fi
+
+if diff -u "$golden" <(printf '%s\n' "$actual"); then
+  echo "apieval: PASS $url == $golden"
+else
+  echo "apieval: FAIL $url != $golden (diff above; toon -d <golden> to inspect as JSON)" >&2
+  exit 1
+fi

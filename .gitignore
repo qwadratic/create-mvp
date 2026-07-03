@@ -6,3 +6,7 @@
 *.key
 id_rsa
 id_ed25519
+# matrix run noise: raw session transcripts (usage.json is the committed summary) + py caches
+evals/matrix-runs/*/.sessions/
+__pycache__/
+*.pyc

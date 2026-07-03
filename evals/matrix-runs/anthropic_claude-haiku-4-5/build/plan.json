@@ -1,0 +1,24 @@
+{
+  "components": [
+    {
+      "id": "word-counter",
+      "desc": "Core frequency engine: reads stdin, lowercases, splits on [^a-z], counts occurrences. Returns dict {word: count}.",
+      "deps": []
+    },
+    {
+      "id": "json-formatter",
+      "desc": "Sorts frequencies by count (desc) then word (asc). Outputs deterministic JSON: [{\"word\": ..., \"count\": ...}, ...]. No extra whitespace.",
+      "deps": ["word-counter"]
+    },
+    {
+      "id": "cli-interface",
+      "desc": "Parses --top N (default 5), reads stdin, slices top-N results, pipes through json-formatter. Entry point logic.",
+      "deps": ["word-counter", "json-formatter"]
+    },
+    {
+      "id": "golden-test",
+      "desc": "Fixed input file + golden.json expected output. Runs cli-interface, pipes output to 'jq -S .' and compares byte-identical.",
+      "deps": ["cli-interface"]
+    }
+  ]
+}

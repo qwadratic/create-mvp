@@ -1,0 +1,34 @@
+{
+  "components": [
+    {
+      "id": "cli-arguments",
+      "desc": "Implement argument parsing using Python stdlib argparse to parse `--top` flag (integer, default 5) and handle invalid inputs. Test with mock arguments.",
+      "deps": []
+    },
+    {
+      "id": "word-tokenization",
+      "desc": "Implement text processing function to lowercase input and split on any non-letter character using regular expressions. Test with various punctuation, numbers, and whitespace.",
+      "deps": []
+    },
+    {
+      "id": "frequency-sorting",
+      "desc": "Implement frequency counter and sorting logic. Sort by count descending, then word ascending for ties. Slice to top N. Test with fixed collections containing duplicate counts.",
+      "deps": []
+    },
+    {
+      "id": "json-serialization",
+      "desc": "Implement deterministic JSON formatting function to output standard JSON array of `{\"word\": str, \"count\": int}` objects. Test output string is exact.",
+      "deps": []
+    },
+    {
+      "id": "cli-integration",
+      "desc": "Integrate components into executable `wordfreq.py` reading from standard input and writing to standard output. Test with shell pipes.",
+      "deps": ["cli-arguments", "word-tokenization", "frequency-sorting", "json-serialization"]
+    },
+    {
+      "id": "golden-test",
+      "desc": "Create a fixed input file, expected JSON output file, and automated test script using jq to compare actual and expected output byte-by-byte.",
+      "deps": ["cli-integration"]
+    }
+  ]
+}

@@ -1,0 +1,147 @@
+{
+  "checks": [
+    {
+      "name": "plan-exists",
+      "pass": true,
+      "detail": "build/plan.json parses"
+    },
+    {
+      "name": "plan-schema",
+      "pass": true,
+      "detail": "components[] each have id/desc/deps"
+    },
+    {
+      "name": "dag-valid",
+      "pass": true,
+      "detail": "deps acyclic, all ids resolve"
+    },
+    {
+      "name": "src:cli-arguments",
+      "pass": true,
+      "detail": "src/cli-arguments non-empty"
+    },
+    {
+      "name": "checksh:cli-arguments",
+      "pass": true,
+      "detail": "src/cli-arguments/check.sh executable"
+    },
+    {
+      "name": "run:cli-arguments",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:cli-arguments",
+      "pass": true,
+      "detail": "build/cli-arguments.done present"
+    },
+    {
+      "name": "src:word-tokenization",
+      "pass": true,
+      "detail": "src/word-tokenization non-empty"
+    },
+    {
+      "name": "checksh:word-tokenization",
+      "pass": true,
+      "detail": "src/word-tokenization/check.sh executable"
+    },
+    {
+      "name": "run:word-tokenization",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:word-tokenization",
+      "pass": true,
+      "detail": "build/word-tokenization.done present"
+    },
+    {
+      "name": "src:frequency-sorting",
+      "pass": true,
+      "detail": "src/frequency-sorting non-empty"
+    },
+    {
+      "name": "checksh:frequency-sorting",
+      "pass": true,
+      "detail": "src/frequency-sorting/check.sh executable"
+    },
+    {
+      "name": "run:frequency-sorting",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:frequency-sorting",
+      "pass": true,
+      "detail": "build/frequency-sorting.done present"
+    },
+    {
+      "name": "src:json-serialization",
+      "pass": true,
+      "detail": "src/json-serialization non-empty"
+    },
+    {
+      "name": "checksh:json-serialization",
+      "pass": true,
+      "detail": "src/json-serialization/check.sh executable"
+    },
+    {
+      "name": "run:json-serialization",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:json-serialization",
+      "pass": true,
+      "detail": "build/json-serialization.done present"
+    },
+    {
+      "name": "src:cli-integration",
+      "pass": true,
+      "detail": "src/cli-integration non-empty"
+    },
+    {
+      "name": "checksh:cli-integration",
+      "pass": true,
+      "detail": "src/cli-integration/check.sh executable"
+    },
+    {
+      "name": "run:cli-integration",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:cli-integration",
+      "pass": true,
+      "detail": "build/cli-integration.done present"
+    },
+    {
+      "name": "src:golden-test",
+      "pass": true,
+      "detail": "src/golden-test non-empty"
+    },
+    {
+      "name": "checksh:golden-test",
+      "pass": true,
+      "detail": "src/golden-test/check.sh executable"
+    },
+    {
+      "name": "run:golden-test",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:golden-test",
+      "pass": true,
+      "detail": "build/golden-test.done present"
+    },
+    {
+      "name": "review-verdict",
+      "pass": true,
+      "detail": "build/report.md has VERDICT: PASS"
+    }
+  ],
+  "passed": 28,
+  "total": 28,
+  "score": 1
+}

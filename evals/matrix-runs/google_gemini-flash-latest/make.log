@@ -1,0 +1,104 @@
+mkdir -p build
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent plan goal.md > build/plan.json
+jq -e '.components | length > 0' build/plan.json > /dev/null   # gate: valid decomposition
+jq -r '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n\t$(AGENT) build \(.id)\n\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build cli-arguments
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build word-tokenization
+[word-tokenization] implemented. 
+
+- Created tokenizer implementation with lowercase and regex split in `src/word-tokenization/tokenizer.py`.
+- Added unit tests with various punctuation, numbers, and whitespace in `src/word-tokenization/test_tokenizer.py`.
+- Added executable check script `src/word-tokenization/check.sh`.
+
+Relative effort: low (standard library regex and unittest).
+bash src/word-tokenization/check.sh
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.000s
+
+OK
+touch build/word-tokenization.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build frequency-sorting
+relative effort: low (simple argparse wrapper + standard python unittest).
+
+cli-arguments component implemented.
+`src/cli-arguments/cli_args.py` handles CLI arguments.
+`src/cli-arguments/test_cli_args.py` verifies behavior under mock arguments.
+`src/cli-arguments/check.sh` executes test suite. All tests pass.
+bash src/cli-arguments/check.sh
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.002s
+
+OK
+All cli-arguments tests passed.
+touch build/cli-arguments.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build json-serialization
+`frequency-sorting` component implemented.
+
+### Effort
+- low: python standard library `Counter` and standard unit testing library used.
+
+### Details
+- `src/frequency-sorting/sorting.py`: frequency counter and tie-breaker sorting logic.
+- `src/frequency-sorting/test_sorting.py`: unit tests targeting tie-breaker cases and edge cases.
+- `src/frequency-sorting/check.sh`: executable test runner. All tests passing.
+bash src/frequency-sorting/check.sh
+.......
+----------------------------------------------------------------------
+Ran 7 tests in 0.000s
+
+OK
+touch build/frequency-sorting.done
+json-serialization implemented. 
+
+[json-serialization] [implemented] [ensures deterministic, key-ordered, standard JSON list output]. [none].
+
+Relative effort: Low. Logic utilizes Python's standard `json` library with strict dictionary ordering and validation rules.
+bash src/json-serialization/check.sh
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.000s
+
+OK
+All json-serialization tests passed.
+touch build/json-serialization.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build cli-integration
+component 'cli-integration' implemented. `wordfreq.py` created to parse command-line arguments, tokenize standard input, count/sort word frequencies, and serialize results into deterministic JSON. `check.sh` created to run self-tests with shell pipes.
+
+- Relative effort: Low.
+- Reason: Components integrated cleanly via standard library imports and system path manipulation; simple Unix-style pipes and jq validations used for complete coverage.
+bash src/cli-integration/check.sh
+=== Running cli-integration self-tests ===
+Test 1 (Basic pipe + default top 5): PASSED
+Test 2 (Custom --top 2): PASSED
+Test 3 (Tie breaking alphabetical sorting): PASSED
+Test 4 (Top 0): PASSED
+Test 5 (Empty input): PASSED
+Test 6 (Invalid --top negative): PASSED
+Test 7 (Invalid --top non-integer): PASSED
+Test 8 (Unrecognized option): PASSED
+All tests completed successfully!
+touch build/cli-integration.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build golden-test
+[golden-test] Created fixed input text file `src/golden-test/input.txt`.
+[golden-test] Created expected JSON output `src/golden-test/expected.json`.
+[golden-test] Created automated test script `src/golden-test/check.sh` comparing actual output with expected output byte-by-byte using jq.
+
+Tested locally:
+```bash
+./src/golden-test/check.sh
+```
+Result: PASSED.
+bash src/golden-test/check.sh
+=== Running golden-test self-test ===
+Asserting semantic JSON equality with jq...
+Canonicalizing both JSON outputs with jq...
+Comparing actual and expected normalized outputs byte-by-byte...
+Comparing raw outputs byte-by-byte...
+Golden test PASSED successfully!
+touch build/golden-test.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent review > build/report.md
+grep -q 'VERDICT: PASS' build/report.md

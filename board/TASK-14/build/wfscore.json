@@ -1,0 +1,167 @@
+{
+  "checks": [
+    {
+      "name": "plan-exists",
+      "pass": true,
+      "detail": "build/plan.json parses"
+    },
+    {
+      "name": "plan-schema",
+      "pass": true,
+      "detail": "components[] each have id/desc/deps"
+    },
+    {
+      "name": "dag-valid",
+      "pass": true,
+      "detail": "deps acyclic, all ids resolve"
+    },
+    {
+      "name": "src:stub-agent",
+      "pass": true,
+      "detail": "src/stub-agent non-empty"
+    },
+    {
+      "name": "checksh:stub-agent",
+      "pass": true,
+      "detail": "src/stub-agent/check.sh executable"
+    },
+    {
+      "name": "run:stub-agent",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:stub-agent",
+      "pass": true,
+      "detail": "build/stub-agent.done present"
+    },
+    {
+      "name": "src:plan-gate",
+      "pass": true,
+      "detail": "src/plan-gate non-empty"
+    },
+    {
+      "name": "checksh:plan-gate",
+      "pass": true,
+      "detail": "src/plan-gate/check.sh executable"
+    },
+    {
+      "name": "run:plan-gate",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:plan-gate",
+      "pass": true,
+      "detail": "build/plan-gate.done present"
+    },
+    {
+      "name": "src:components-generator",
+      "pass": true,
+      "detail": "src/components-generator non-empty"
+    },
+    {
+      "name": "checksh:components-generator",
+      "pass": true,
+      "detail": "src/components-generator/check.sh executable"
+    },
+    {
+      "name": "run:components-generator",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:components-generator",
+      "pass": true,
+      "detail": "build/components-generator.done present"
+    },
+    {
+      "name": "src:engine-core-makefile",
+      "pass": true,
+      "detail": "src/engine-core-makefile non-empty"
+    },
+    {
+      "name": "checksh:engine-core-makefile",
+      "pass": true,
+      "detail": "src/engine-core-makefile/check.sh executable"
+    },
+    {
+      "name": "run:engine-core-makefile",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:engine-core-makefile",
+      "pass": true,
+      "detail": "build/engine-core-makefile.done present"
+    },
+    {
+      "name": "src:census-target",
+      "pass": true,
+      "detail": "src/census-target non-empty"
+    },
+    {
+      "name": "checksh:census-target",
+      "pass": true,
+      "detail": "src/census-target/check.sh executable"
+    },
+    {
+      "name": "run:census-target",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:census-target",
+      "pass": true,
+      "detail": "build/census-target.done present"
+    },
+    {
+      "name": "src:mermaid-target",
+      "pass": true,
+      "detail": "src/mermaid-target non-empty"
+    },
+    {
+      "name": "checksh:mermaid-target",
+      "pass": true,
+      "detail": "src/mermaid-target/check.sh executable"
+    },
+    {
+      "name": "run:mermaid-target",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:mermaid-target",
+      "pass": true,
+      "detail": "build/mermaid-target.done present"
+    },
+    {
+      "name": "src:e2e-check",
+      "pass": true,
+      "detail": "src/e2e-check non-empty"
+    },
+    {
+      "name": "checksh:e2e-check",
+      "pass": true,
+      "detail": "src/e2e-check/check.sh executable"
+    },
+    {
+      "name": "run:e2e-check",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:e2e-check",
+      "pass": true,
+      "detail": "build/e2e-check.done present"
+    },
+    {
+      "name": "review-verdict",
+      "pass": true,
+      "detail": "build/report.md has VERDICT: PASS"
+    }
+  ],
+  "passed": 32,
+  "total": 32,
+  "score": 1
+}

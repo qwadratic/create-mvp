@@ -80,17 +80,21 @@ proves the `$(MAKE) -C dir all` pattern.
   re-derives goal from desc). Rejected — desc is one sentence; the planner has
   the context NOW; make it write the sub-goal while it's cheap.
 
-Plan gate in `build.mk` grows two clauses (composite⇒sub_goal; fanout ceiling
-— graft 2):
+Plan gate in `build.mk` grows three clauses (composite⇒sub_goal; fanout
+ceiling — graft 2; id/dep charset allowlist — ids are spliced verbatim into
+makefile targets and shell recipe lines by the jq template, and LLM output is
+a trust boundary, same doctrine as §5b):
 
 ```make
 MAXFANOUT ?= 8   # top of prd fanout range; per-level tree-width insurance
 
 $(B)/plan.json: $(GOAL) $(B)/effort.json
 	$(AGENT) plan $< > $@
-	jq -e --argjson maxf $(MAXFANOUT) '(.components | length > 0 and length <= $$maxf) and all(.components[];
-	  (.kind // "leaf") == "leaf" or (.sub_goal | type=="string" and length > 0)
-	)' $@ > /dev/null   # gate: valid decomposition; composite ⇒ sub_goal; bounded fanout
+	jq -e --argjson maxf $(MAXFANOUT) 'def okid: type=="string" and test("^[a-z0-9][a-z0-9-]{0,63}$$");
+	  (.components | length > 0 and length <= $$maxf) and all(.components[];
+	  (.id|okid) and all(.deps[]?; okid) and
+	  ((.kind // "leaf") == "leaf" or (.sub_goal | type=="string" and length > 0))
+	)' $@ > /dev/null   # gate: bounded fanout; composite ⇒ sub_goal; id/dep charset
 ```
 
 ## 2. Layout — composite lives at `src/<id>/`
@@ -207,12 +211,15 @@ set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)   # absolute engine dir
 B=${B:-build} SRC=${SRC:-src}
 id=$1
+# trust boundary (same allowlist as build.mk plan gate): id becomes a path
+# component + shell arg — reject metachars/traversal even when called directly
+[[ $id =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || { echo "subtree: invalid id: $id" >&2; exit 1; }
 d=$SRC/$id
 mkdir -p "$d"
 
 # goal.md from plan.json .sub_goal — cmp guard preserves mtime (board.mk trick):
 # unchanged sub_goal ⇒ untouched mtime ⇒ child make resumes instead of replanning
-jq -r --arg id "$id" '.components[] | select(.id==$id) | .sub_goal' "$B/plan.json" > "$d/goal.md.new"
+jq -r --arg id "$id" '.components[] | select(.id==$id) | .sub_goal // empty' "$B/plan.json" > "$d/goal.md.new"
 grep -q '[^[:space:]]' "$d/goal.md.new" || { echo "subtree: empty sub_goal for $id" >&2; exit 1; }
 if cmp -s "$d/goal.md.new" "$d/goal.md" 2>/dev/null; then rm "$d/goal.md.new"; else mv "$d/goal.md.new" "$d/goal.md"; fi
 
@@ -478,7 +485,7 @@ explosion~~ (MAXFANOUT gate, §1).
 | `engine/prompts/plan.md` | schema + `${COMPOSITE_RULES}` |
 | `engine/agent` | plan role: depth-conditional `COMPOSITE_RULES` export; classify role: MAXTIER jq clamp |
 | `engine/build.mk` | depth + MAXTIER + MAXFANOUT vars; plan gate clauses; jq template fork; progress + graph recursion |
-| `engine/subtree` | NEW ~20-line scaffold helper |
+| `engine/subtree` | NEW ~30-line scaffold helper |
 | `evals/wfcheck` | `$self` capture; subtree loop; `.subtrees` in wfscore.json |
 | `engine/prompts/build.md`, `review.md`, `classify.md`\*, `board.mk` | **unchanged** (\*optional MAXTIER belt clause) |
 

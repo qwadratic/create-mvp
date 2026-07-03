@@ -1,9 +1,10 @@
 # STATE — repo snapshot for the iterate-until-viral loop
 
-Last updated: 2026-07-03 @ post-nested-decomposition fixer pass (`8e949f5`).
+Last updated: 2026-07-04 @ fixer round 2 (id trust-boundary gate + doc sync).
 Working tree clean, all selftests re-run green at write time
-(`wfcheck-selftest` 28/28 incl. nested breaks, `nested-selftest` full matrix,
-`apieval-selftest` incl. TOON round-trip, `selfcheck-classify` tier ordering).
+(`wfcheck-selftest` 28/28 incl. nested breaks, `nested-selftest` full matrix
+incl. id-gate negatives, `apieval-selftest` incl. TOON round-trip,
+`selfcheck-classify` tier ordering).
 Link audit across README + docs: 0 dead links.
 
 ## What exists
@@ -11,7 +12,7 @@ Link audit across README + docs: 0 dead links.
 | area | artifact | status |
 |---|---|---|
 | Engine core | [`engine/build.mk`](../engine/build.mk) (~120 lines): classify → plan → jq-generated `components.mk` (re-include restart) → per-component agents + `check.sh` gates → review gate; `.DELETE_ON_ERROR` resume | live-verified cold: fresh `/tmp` project, 2-line Makefile, full pipeline + rerun no-op |
-| Nested decomposition | [`docs/rfc-nested.md`](rfc-nested.md): composite components → [`engine/subtree`](../engine/subtree) scaffold + recursive `$(MAKE) -C`; deterministic bounds (MAXDEPTH 3, MAXTIER clamp, MAXFANOUT 8) in jq/make; progress/graph/wfcheck recurse, flat runs byte-identical | mock-first zero-LLM e2e (`engine/fixtures/nested-selftest.sh`) + live real-PRD run (site-forge) |
+| Nested decomposition | [`docs/rfc-nested.md`](rfc-nested.md): composite components → [`engine/subtree`](../engine/subtree) scaffold + recursive `$(MAKE) -C`; deterministic bounds (MAXDEPTH 3, MAXTIER clamp, MAXFANOUT 8) + id/dep charset allowlist (ids splice into make+shell — trust boundary) in jq/make; progress/graph/wfcheck recurse, flat runs byte-identical | mock-first zero-LLM e2e (`engine/fixtures/nested-selftest.sh`) + live real-PRD run (site-forge) |
 | Board integration | [`engine/board.mk`](../engine/board.mk): Backlog.md = default work queue; `board` / `board-next` / `board-task`; failed gate leaves task In Progress | verified e2e — TASK-14 pulled → Done via CLI |
 | Self-host proof | [`board/TASK-14/`](../board/TASK-14/) — engine built itself from the board, 7 components, wfcheck 32/32 | committed run artifacts |
 | Agent adapter | [`engine/agent`](../engine/agent): roles plan/build/review; `RUNTIME=cli\|sdk`, `ENGINE_CLI=pi\|claude`, `ENGINE_CLI_FLAGS` passthrough; per-unit `effort.json` model routing | pi-cli + sdk live-verified; claude reaches auth boundary only (TASK-16) |

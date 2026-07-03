@@ -1,9 +1,9 @@
 # Engine internals: the make features doing the work
 
-The whole engine is one file, [`engine/build.mk`](../engine/build.mk) (~80 lines).
+The whole engine is one file, [`engine/build.mk`](../engine/build.mk) (~120 lines).
 Every feature below is stock GNU make — nothing is patched or wrapped. This doc
 explains what each feature does here and why it earns its place. Excerpts are
-verbatim from the engine.
+verbatim from the engine unless labeled otherwise.
 
 ## `.DELETE_ON_ERROR` — a failed agent never counts as done
 
@@ -23,7 +23,7 @@ This is what makes every recipe line a *gate*. Take the plan rule:
 ```make
 $(B)/plan.json: $(GOAL) $(B)/effort.json
 	$(AGENT) plan $< > $@
-	jq -e '.components | length > 0' $@ > /dev/null   # gate: valid decomposition
+	jq -e --argjson maxf $(MAXFANOUT) 'def okid: type=="string" and test("^[a-z0-9][a-z0-9-]{0,63}$$"); (.components | length > 0 and length <= $$maxf) and all(.components[]; (.id|okid) and all(.deps[]?; okid) and ((.kind // "leaf") == "leaf" or (.sub_goal | type=="string" and length > 0)))' $@ > /dev/null   # gate: bounded fanout; composite ⇒ sub_goal; id/dep charset — ids splice into make targets + shell recipe lines via the jq template (LLM output = trust boundary)
 ```
 
 If the `jq -e` check fails, the recipe fails, `plan.json` is deleted, and the
@@ -31,12 +31,22 @@ pipeline stops — an invalid decomposition cannot leak downstream. The same
 pattern gates the effort classifier (schema check), every component
 (`check.sh`), and the final review (`grep -q 'VERDICT: PASS'`).
 
+The `okid` clause is a security gate, not a style check: component ids are
+spliced verbatim into `components.mk` — they become make target names, shell
+recipe arguments, and `src/<id>` path components. An LLM-authored id like
+`x; rm -rf .` or `../escape` would otherwise inject recipe text or walk out
+of the source tree, so ids and dep references are allowlisted to
+`[a-z0-9-]` before any generation happens (`engine/subtree` re-checks the
+same regex as defense in depth).
+
 ## `-include` + generated `components.mk` — the agent-shaped DAG
 
 Make has a little-known superpower: if an included makefile is out of date and
 there is a rule to rebuild it, make rebuilds it and **restarts itself** with
 the new content. The engine uses this so the dependency graph itself comes
-from the planning agent:
+from the planning agent — shown here reduced to its leaf-only core (the
+composite fork lives in the same template; see the recursive `$(MAKE)`
+section below):
 
 ```make
 -include $(B)/components.mk

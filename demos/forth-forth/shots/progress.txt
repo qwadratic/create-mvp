@@ -1,0 +1,11 @@
+ ✓ build/effort.json
+ ✓ build/plan.json
+ ✓ build/tests-golden.done
+ ✓ build/stage0-core.done
+ ✓ build/stage0-compiler-support.done
+ ✓ build/stage0-gate.done
+ ✓ build/stage1-compiler.done
+ ✓ build/gate.done
+ ✓ build/selfhost.done
+ ✓ build/report.md
+[########################] 10/10 (100%)

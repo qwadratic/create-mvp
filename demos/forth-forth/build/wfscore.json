@@ -1,0 +1,167 @@
+{
+  "checks": [
+    {
+      "name": "plan-exists",
+      "pass": true,
+      "detail": "build/plan.json parses"
+    },
+    {
+      "name": "plan-schema",
+      "pass": true,
+      "detail": "components[] each have id/desc/deps"
+    },
+    {
+      "name": "dag-valid",
+      "pass": true,
+      "detail": "deps acyclic, all ids resolve"
+    },
+    {
+      "name": "src:tests-golden",
+      "pass": true,
+      "detail": "src/tests-golden non-empty"
+    },
+    {
+      "name": "checksh:tests-golden",
+      "pass": true,
+      "detail": "src/tests-golden/check.sh executable"
+    },
+    {
+      "name": "run:tests-golden",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:tests-golden",
+      "pass": true,
+      "detail": "build/tests-golden.done present"
+    },
+    {
+      "name": "src:stage0-core",
+      "pass": true,
+      "detail": "src/stage0-core non-empty"
+    },
+    {
+      "name": "checksh:stage0-core",
+      "pass": true,
+      "detail": "src/stage0-core/check.sh executable"
+    },
+    {
+      "name": "run:stage0-core",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:stage0-core",
+      "pass": true,
+      "detail": "build/stage0-core.done present"
+    },
+    {
+      "name": "src:stage0-compiler-support",
+      "pass": true,
+      "detail": "src/stage0-compiler-support non-empty"
+    },
+    {
+      "name": "checksh:stage0-compiler-support",
+      "pass": true,
+      "detail": "src/stage0-compiler-support/check.sh executable"
+    },
+    {
+      "name": "run:stage0-compiler-support",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:stage0-compiler-support",
+      "pass": true,
+      "detail": "build/stage0-compiler-support.done present"
+    },
+    {
+      "name": "src:stage0-gate",
+      "pass": true,
+      "detail": "src/stage0-gate non-empty"
+    },
+    {
+      "name": "checksh:stage0-gate",
+      "pass": true,
+      "detail": "src/stage0-gate/check.sh executable"
+    },
+    {
+      "name": "run:stage0-gate",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:stage0-gate",
+      "pass": true,
+      "detail": "build/stage0-gate.done present"
+    },
+    {
+      "name": "src:stage1-compiler",
+      "pass": true,
+      "detail": "src/stage1-compiler non-empty"
+    },
+    {
+      "name": "checksh:stage1-compiler",
+      "pass": true,
+      "detail": "src/stage1-compiler/check.sh executable"
+    },
+    {
+      "name": "run:stage1-compiler",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:stage1-compiler",
+      "pass": true,
+      "detail": "build/stage1-compiler.done present"
+    },
+    {
+      "name": "src:gate",
+      "pass": true,
+      "detail": "src/gate non-empty"
+    },
+    {
+      "name": "checksh:gate",
+      "pass": true,
+      "detail": "src/gate/check.sh executable"
+    },
+    {
+      "name": "run:gate",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:gate",
+      "pass": true,
+      "detail": "build/gate.done present"
+    },
+    {
+      "name": "src:selfhost",
+      "pass": true,
+      "detail": "src/selfhost non-empty"
+    },
+    {
+      "name": "checksh:selfhost",
+      "pass": true,
+      "detail": "src/selfhost/check.sh executable"
+    },
+    {
+      "name": "run:selfhost",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:selfhost",
+      "pass": true,
+      "detail": "build/selfhost.done present"
+    },
+    {
+      "name": "review-verdict",
+      "pass": true,
+      "detail": "build/report.md has VERDICT: PASS"
+    }
+  ],
+  "passed": 32,
+  "total": 32,
+  "score": 1
+}

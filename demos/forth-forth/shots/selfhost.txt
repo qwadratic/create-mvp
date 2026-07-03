@@ -1,0 +1,6 @@
+$ python3 src/stage0/stage0.py src/selfhost/compiler.fs src/selfhost/compiler.fs > compiler.py
+$ python3 compiler.py src/tests/fib.fs > fib2.py
+$ python3 fib2.py
+0 1 1 2 3 5 8 13 21 34 
+$ cmp fib2-output golden/fib.out && echo SELF-HOSTED: FIXED POINT REACHED
+SELF-HOSTED: FIXED POINT REACHED

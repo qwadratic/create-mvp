@@ -1,0 +1,30 @@
+<html><body style="margin:0;background:#0d1117"><div style="padding:18px">
+<div style="color:#8b949e;font:12px Menlo,monospace;margin-bottom:8px">forth-forth · graph</div>
+<pre style="color:#3fb950;font:13px Menlo,monospace;margin:0">graph TD
+  build/report.md --&gt; all
+  goal.md --&gt; build/effort.json
+  build --&gt; build/effort.json
+  goal.md --&gt; build/plan.json
+  build/effort.json --&gt; build/plan.json
+  build/plan.json --&gt; build/components.mk
+  build/components.mk --&gt; build/report.md
+  $(COMPONENTS) --&gt; build/report.md
+  build/plan.json --&gt; build/tests-golden.done
+  build/plan.json --&gt; build/stage0-core.done
+  build/plan.json --&gt; build/stage0-compiler-support.done
+  build/stage0-core.done --&gt; build/stage0-compiler-support.done
+  build/plan.json --&gt; build/stage0-gate.done
+  build/stage0-core.done --&gt; build/stage0-gate.done
+  build/tests-golden.done --&gt; build/stage0-gate.done
+  build/plan.json --&gt; build/stage1-compiler.done
+  build/stage0-core.done --&gt; build/stage1-compiler.done
+  build/stage0-compiler-support.done --&gt; build/stage1-compiler.done
+  build/plan.json --&gt; build/gate.done
+  build/stage0-gate.done --&gt; build/gate.done
+  build/stage1-compiler.done --&gt; build/gate.done
+  build/tests-golden.done --&gt; build/gate.done
+  build/plan.json --&gt; build/selfhost.done
+  build/stage1-compiler.done --&gt; build/selfhost.done
+  build/gate.done --&gt; build/selfhost.done
+</pre>
+</div></body></html>

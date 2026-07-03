@@ -1,0 +1,4 @@
+OK: fib
+OK: fizzbuzz
+OK: stackops
+gate: all tests pass (interpreted == compiled == golden)

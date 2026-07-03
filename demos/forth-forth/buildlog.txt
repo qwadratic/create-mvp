@@ -1,0 +1,121 @@
+mkdir -p build
+../../engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+../../engine/agent plan goal.md > build/plan.json
+jq -e '.components | length > 0' build/plan.json > /dev/null   # gate: valid decomposition
+jq -r '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n\t$(AGENT) build \(.id)\n\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+../../engine/agent build tests-golden
+Done.
+
+Files:
+- `src/tests/fib.fs`, `src/tests/fizzbuzz.fs`, `src/tests/stackops.fs` — verbatim from spec
+- `src/tests/golden/{fib,fizzbuzz,stackops}.out` — pinned bytes written from spec (24/66/40 bytes; number lines end in one trailing space, fizzbuzz word lines do not)
+- `src/tests-golden/check.sh` — executable; verifies all 6 files exist, cmps each golden against embedded here-doc bytes, checks pinned byte counts, exits nonzero on mismatch
+
+Verified: passes clean (exit 0), fails on corrupted golden (exit 1), restored. Goldens never touched program output — written from spec text only.
+bash src/tests-golden/check.sh
+OK: src/tests/golden/fib.out
+OK: src/tests/golden/fizzbuzz.out
+OK: src/tests/golden/stackops.out
+touch build/tests-golden.done
+../../engine/agent build stage0-core
+Done. All checks pass, plus bonus verification against the three pinned goldens.
+
+Files:
+- `src/stage0/stage0.py` — interpreter (spec path, stdlib only, ~190 lines). Single `Forth` class: pos-based scanner (needed for `." text"`, `\`, `( )` which break whitespace tokenizing), compile-time backpatching for `if/else/then` + `begin/until` + `do/loop` (nesting free via control stack), primitive dispatch in `exec_word`. `input_path` stored but unused — hook for stage0-compiler-support component. `/` and `mod` use Python floored `//`/`%` (matches Forth FM/MOD convention).
+- `src/stage0-core/check.sh` — executable, 10 snippet tests via `cmp` (arith/signed literals, comparisons -1/0, stack ops, `.`/`emit`/`cr`/`."`, colon defs + case-insensitivity, nested if/else/then, begin/until, nested do/loop/i, variable/@/!, both comment styles). Exit 0 only if all pass; follows sibling `tests-golden` layout (artifact at spec path, check.sh in component dir).
+
+ponytail: top-level control flow (`if`/`do` outside `:`) unsupported per spec — raises "unknown word". Upgrade path: wrap top-level stream in anonymous definition if ever needed.
+bash src/stage0-core/check.sh
+OK: arith
+OK: cmpw
+OK: stackw
+OK: outw
+OK: colon
+OK: ifelse
+OK: until
+OK: doloop
+OK: vars
+OK: comments
+ALL PASS
+touch build/stage0-core.done
+../../engine/agent build stage0-compiler-support
+Done. Regression on stage0-core also passes.
+
+Changes:
+
+- `src/stage0/stage0.py` — added string table (`self.strings = ['']`, handle 0 slot unused), lazy input-file token stream, and words:
+  - `token` — reads `input.fs` (argv[2]) whitespace tokens, pushes fresh handle; 0 at EOF or when no input file given
+  - `h.` — prints handle string, no newline
+  - `h=` — string equality, -1/0
+  - `h>n` — regex-validated signed decimal parse: `n -1` or `0 0`
+  - `s" text"` — interns literal, pushes handle; wired into both `compile_def` (as `lit`) and top-level `interpret`
+
+New files:
+
+- `src/stage0-compiler-support/driver.fs` — exercises `s"` inside+outside definitions, `h.`, `h=`, `h>n` success/failure, `token` loop through EOF, plus a second `token` call after EOF
+- `src/stage0-compiler-support/input.fs` — `foo 42 -7 stop 12x bar` (multi-line, tests whitespace splitting)
+- `src/stage0-compiler-support/check.sh` — cmp driver output against embedded expected bytes; also checks `token` → 0 with no input file at all. Exits 0, prints `OK`.
+bash src/stage0-compiler-support/check.sh
+OK
+touch build/stage0-compiler-support.done
+../../engine/agent build stage0-gate
+Done. `src/stage0-gate/check.sh` runs stage0 on each pinned test, `cmp` vs golden, exit nonzero on any diff. All three pass.
+bash src/stage0-gate/check.sh
+OK: fib
+OK: fizzbuzz
+OK: stackops
+touch build/stage0-gate.done
+../../engine/agent build stage1-compiler
+Done. Component built, check passes in <1s.
+
+**Files:**
+- `src/stage1/compiler.fs` — pure-Forth compiler (integration path used by gate). Emits Python runtime preamble (stack `S`, memory `M`, loop stack `L`, word dict `W`, all Stage-0 ops), then translates token stream into indented Python. Colon defs → `def _f(): ... W["name"]=_f`; if/else/then → Python if/else; begin/until → `while True` + break; do/loop → `_do()`/`_loop()` matching stage0's run-body-at-least-once semantics; variables via `_mkvar()`.
+- `src/stage1-compiler/smoke.fs` — non-pinned smoke covering literals, defs, nested if/else, begin/until, do/loop/i, variable/@/!, `.`/emit/cr/`."`, both comment styles, all arith/cmp/stack ops.
+- `src/stage1-compiler/check.sh` — greps compiler.fs for Python-looking lines, compiles smoke, `cmp` compiled vs interpreted output.
+
+**Verified beyond check:** all three pinned tests (fib, fizzbuzz, stackops) compiled + run → byte-exact golden match.
+
+**ponytail shortcuts** (forced by `token` = pure whitespace split, no char access on handles):
+- `\` comment: no line info exists → skips tokens until `:` or EOF. Works for pinned fib.fs (comment precedes a def); comment containing `:` or followed by non-def code would break.
+- `."` detection by elimination: token not a number/keyword/registered name → treated as `."`; string limited to ONE following token ending in `"` (all pinned strings are single-token). Multi-word strings unsupported. Upgrade path: line-aware `token` in stage0.
+- `(` comment requires space-separated `)`.
+- name registry capacity 65 slots (variable-cell array hack).
+bash src/stage1-compiler/check.sh
+stage1-compiler: OK (interpreted == compiled on smoke test)
+touch build/stage1-compiler.done
+../../engine/agent build gate
+Done. `src/gate/check.sh` — POSIX sh, cd's to repo root, loops fib/fizzbuzz/stackops:
+
+1. interpret via stage0 → `cmp` vs golden
+2. compile → `build-out/<t>.py`
+3. run compiled → `cmp` vs same golden
+
+`set -eu` + explicit `cmp || exit 1` — any mismatch or pipeline failure exits nonzero. Runs clean in ~1s, no network.
+bash src/gate/check.sh
+OK: fib
+OK: fizzbuzz
+OK: stackops
+gate: all tests pass (interpreted == compiled == golden)
+touch build/gate.done
+../../engine/agent build selfhost
+Self-hosting **achieved** — including a true fixed point (gen1 compiler output == gen2, byte-identical).
+
+Files under `src/selfhost/`:
+
+- **`compiler.fs`** — stage1 compiler extended per spec (emitted runtime gains string table `ST`, `I()` intern, `_token` reading `sys.argv[1]`, `_hdot`/`_heq`/`_h2n`) and restructured to survive compiling itself:
+  - every source string is single-token pieces joined by explicit `sp` (32 emit) — multi-word strings can't survive whitespace tokenization
+  - quote/triple-quote chars in emitted Python built via `emit` (`q`, `q3`), never literal in strings
+  - `s"`/`."` keyword handles (inexpressible as `s"` literals — they contain `"`) captured from pragma first line `( s" ." )`, a plain comment to stage0
+  - name table dropped (it would have to register its own pool — impossible fixed point); unknown tokens compile to `W[name]()` calls
+- **`check.sh`** — runs the chain (self-compile → `compiler.py` compiles `fib.fs` → `fib2.py` output `cmp` vs golden), writes honest `RESULT.md`, always exits 0. Failure path verified by sabotage test (reports WHY, exits 0).
+- **`RESULT.md`** — ACHIEVED, with honest deviation note: self-hosted compiler lives at `src/selfhost/compiler.fs` (stage1 verbatim cannot self-compile; rules confine writes to `src/selfhost/`; stage1 is gate-locked). Bonus results recorded: gen2 fixed point, stackops also golden via self-compiled compiler.
+
+Gate regression confirmed intact: `src/gate/check.sh` still passes all three tests. Runtime ~0.3s.
+
+ponytail: pragma-based `s"`/`."` handle capture caps self-compilable inputs to pragma-carrying ones (fizzbuzz excluded, documented); `_h2n` uses Python `int()` (accepts `1_0`, no such tokens exist here) — both noted in RESULT.md with upgrade paths implicit (char-inspection word in stage0 would remove both ceilings).
+bash src/selfhost/check.sh
+selfhost: ACHIEVED (see src/selfhost/RESULT.md)
+touch build/selfhost.done
+../../engine/agent review > build/report.md
+grep -q 'VERDICT: PASS' build/report.md

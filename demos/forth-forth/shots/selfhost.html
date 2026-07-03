@@ -1,0 +1,10 @@
+<html><body style="margin:0;background:#0d1117"><div style="padding:18px">
+<div style="color:#8b949e;font:12px Menlo,monospace;margin-bottom:8px">forth-forth · selfhost</div>
+<pre style="color:#3fb950;font:13px Menlo,monospace;margin:0">$ python3 src/stage0/stage0.py src/selfhost/compiler.fs src/selfhost/compiler.fs &gt; compiler.py
+$ python3 compiler.py src/tests/fib.fs &gt; fib2.py
+$ python3 fib2.py
+0 1 1 2 3 5 8 13 21 34 
+$ cmp fib2-output golden/fib.out &amp;&amp; echo SELF-HOSTED: FIXED POINT REACHED
+SELF-HOSTED: FIXED POINT REACHED
+</pre>
+</div></body></html>

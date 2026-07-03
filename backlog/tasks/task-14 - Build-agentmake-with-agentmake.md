@@ -1,9 +1,11 @@
 ---
 id: TASK-14
 title: Build agentmake with agentmake
-status: To Do
-assignee: []
+status: In Progress
+assignee:
+  - '@pi-fixer'
 created_date: '2026-07-03 18:20'
+updated_date: '2026-07-03 19:55'
 labels: []
 dependencies: []
 references:
@@ -15,7 +17,15 @@ ordinal: 0
 ## Description
 
 <!-- SECTION:DESCRIPTION:BEGIN -->
-Dogfood directive pointer -> Execute STEERING.md arc: dogfood attempt -> capture mess in docs/dogfood-autopsy.md -> engine/board.mk making backlog the default board (make board-next) -> engine decomposes THIS task and builds itself from the board. Acceptance criteria in STEERING.md.
+Self-host: build the agentmake engine, with the agentmake engine, in this run dir. Everything below is self-contained - no repo exploration needed, build exactly this:
+
+1. engine core makefile: goal.md -> plan.json -> jq-generated components.mk (make re-include restart) -> one build step per component, dep-ordered, parallel-safe under make -j, .DELETE_ON_ERROR resume semantics
+2. plan gate: jq schema check - components non-empty, kebab-case ids, deps may only reference listed ids
+3. stub agent: deterministic bash script with the same CLI contract as a real agent adapter (plan <goal> emits a JSON plan; build <id> writes the component files), so the produced engine is testable offline with zero LLM calls
+4. progress census target: filesystem census of expected artifacts, done/total count, non-zero exit only on census error
+5. mermaid graph target: parse the rule files back into graph TD edges
+
+Constraints: GNU make + bash + jq + coreutils only; no network; no LLM calls inside any check. Gate: an end-to-end check must run the produced engine on a trivial example goal using the stub agent - plan gate passes, components build in dependency order, census reports all done.
 <!-- SECTION:DESCRIPTION:END -->
 
 ## Acceptance Criteria
@@ -25,3 +35,20 @@ Dogfood directive pointer -> Execute STEERING.md arc: dogfood attempt -> capture
 - [ ] #3 engine/board.mk exists and makes backlog the default board (make board-next)
 - [ ] #4 engine decomposes this task and builds itself from the board
 <!-- AC:END -->
+
+## Implementation Plan
+
+<!-- SECTION:PLAN:BEGIN -->
+1. Dogfood attempt on own repo (done: dogfood-board-next/, dogfood-progress-json/)
+2. Capture mess -> docs/dogfood-autopsy.md (done)
+3. engine/board.mk: backlog = default board, make board-next end-to-end (done)
+4. Rewrite this description as the buildable self-host goal (board.mk contract: description = goal body)
+5. make board-next -> engine pulls THIS task, decomposes it, builds itself; artifacts committed under board/TASK-14/
+6. Check ACs via CLI as they become true; README dogfood-story section last
+<!-- SECTION:PLAN:END -->
+
+## Implementation Notes
+
+<!-- SECTION:NOTES:BEGIN -->
+Run 1+2 hit the plan gate: tool-less planner roleplayed fake tool calls exploring STEERING.md/docs refs in the description; jq gate rejected, .DELETE_ON_ERROR cleaned up. Fix: description made self-contained (this edit). Engine-side hardening split out to its own task.
+<!-- SECTION:NOTES:END -->

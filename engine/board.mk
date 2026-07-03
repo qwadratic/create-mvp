@@ -42,8 +42,11 @@ board-task:
 	  /^Description:$$/ { g=1; next } \
 	  g && /^-+$$/ && !b { next } \
 	  g && /^(Acceptance Criteria|Definition of Done|Implementation Plan|Implementation Notes|Comments|Final Summary):$$/ { exit } \
-	  g { b=1; print }' > $(BOARD_RUNS)/$(TASK)/goal.md
-	@grep -q '[^[:space:]]' $(BOARD_RUNS)/$(TASK)/goal.md || { echo "board-task: empty goal from $(TASK) — description missing?" >&2; exit 1; }
+	  g { b=1; print }' > $(BOARD_RUNS)/$(TASK)/goal.md.new
+	@grep -q '[^[:space:]]' $(BOARD_RUNS)/$(TASK)/goal.md.new || { echo "board-task: empty goal from $(TASK) — description missing?" >&2; exit 1; }
+	@if cmp -s $(BOARD_RUNS)/$(TASK)/goal.md.new $(BOARD_RUNS)/$(TASK)/goal.md 2>/dev/null; \
+	then rm $(BOARD_RUNS)/$(TASK)/goal.md.new; \
+	else mv $(BOARD_RUNS)/$(TASK)/goal.md.new $(BOARD_RUNS)/$(TASK)/goal.md; fi  # unchanged task -> untouched mtime -> make resumes
 	@[ -f $(BOARD_RUNS)/$(TASK)/Makefile ] || printf 'GOAL ?= goal.md\ninclude ../../engine/build.mk\n' > $(BOARD_RUNS)/$(TASK)/Makefile
 	backlog task edit $(TASK) -s "In Progress" --plain > /dev/null
 	$(MAKE) -C $(BOARD_RUNS)/$(TASK) -j$(BOARD_JOBS) all

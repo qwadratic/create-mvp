@@ -6,6 +6,8 @@
 *.key
 id_rsa
 id_ed25519
+# demo runtime state: tui-habits writes its data file next to the binary
+demos/tui-habits/habits.json
 # matrix run noise: raw session transcripts (usage.json is the committed summary) + py caches
 evals/matrix-runs/*/.sessions/
 __pycache__/

@@ -5,8 +5,10 @@
 You write a goal file. A planning agent decomposes it into components with
 dependencies; `jq` turns that plan into makefile rules; GNU make schedules one
 build agent per component — parallel with `-j`, resumable by default, and gated
-at every step by mechanical checks. There is no orchestrator daemon and no
-framework: the entire engine is [~80 lines of Makefile](engine/build.mk).
+at every step by mechanical checks. A component too big for one agent is marked
+*composite* and becomes its own nested project — own goal, own plan, own swarm,
+recursively, depth-bounded. There is no orchestrator daemon and no framework:
+the entire engine is [~120 lines of Makefile](engine/build.mk).
 
 ![the engine, live](media/engine-run.gif)
 
@@ -42,7 +44,7 @@ make -j4
 Phase 0 of every run classifies *your* effort. A one-liner gets a small, cheap
 swarm and a smoke review; a full PRD gets a wide fan-out, a big model, and a
 reviewer that checks every acceptance criterion. Same command either way —
-the prompt is the budget dial. All five demos below were built by the engine
+the prompt is the budget dial. All six demos below were built by the engine
 from the goal file shown, unedited:
 
 | demo | the prompt | tier → plan | what came out | |
@@ -52,6 +54,7 @@ from the goal file shown, unedited:
 | [tui-habits](demos/tui-habits/) | [144-byte one-liner](demos/tui-habits/goal.md) | standard → 5 components | curses habit tracker, streak logic, `tmux capture-pane` text goldens. wfcheck 24/24 | <img src="media/tui-habits.gif" width="200"> |
 | [twitter-x](demos/twitter-x/) | [5.4 KB PRD](demos/twitter-x/goal.md) | prd → 7 components, full review | X-clone timeline on 3 load-balanced backends (WAL sqlite), round-robin proxy, load stand proving a perfect 105/105/105 split, visual eval ssim 1.0. Built `-j2`. wfcheck 32/32 | <img src="media/twitter-x.gif" width="200"> |
 | [forth-forth](demos/forth-forth/) | [5.8 KB PRD](demos/forth-forth/goal.md) | prd → 7 components, full review | Forth compiler written in Forth, staged bootstrap, byte-exact pinned goldens — and the stretch goal: [self-hosting fixed point](demos/forth-forth/README.md), gen1 == gen2. First run, zero retries. wfcheck 32/32 | <img src="demos/forth-forth/shots/selfhost.png" width="200"> |
+| [site-forge](demos/site-forge/) | [6.2 KB PRD](demos/site-forge/goal.md) with a subsystem inside | prd → 6 components, **1 composite** | static site generator whose plugin subsystem became its own *nested project*: the planner marked it composite on the first call, the subtree self-planned 5 components (loader, hook API, 2 plugins, integration) and passed its own review. Two themes with SSIM-1.0 goldens; forge builds its own docs site. wfcheck parent 29/29, subtree 24/24 | <img src="demos/site-forge/shots/midnight.png" width="200"> |
 
 33 bytes bought 3 agents and a smoke check. 5.8 KB of PRD bought 7 agents, a
 full-rubric reviewer, and a compiler that compiles itself. Details:
@@ -98,10 +101,23 @@ graph TD
   build/report.md --> all
 ```
 
+**And it recurses.** A plan component may be `"kind": "composite"` with its own
+`sub_goal`: the same `jq -r` line then emits a `+$(MAKE) -C src/<id>` recursion
+instead of a build agent, and the subtree runs this same engine file — own
+classify, own plan, own swarm, own review, whose verdict bubbles up as the
+parent's `.done`. Planning stays lazy (a subtree is planned only when its turn
+comes), and the bounds are deterministic jq/make, not prompt trust: a depth cap
+(`AGENTMAKE_MAXDEPTH`, default 3) forces leaves at the cap, the subtree's
+effort tier is clamped to its parent's (`MAXTIER`), and per-level fan-out is
+gated at 8 (`MAXFANOUT`). `make progress` renders per-level bars and
+`make graph` emits a mermaid subgraph per composite. Validated on a real PRD:
+[demos/site-forge](demos/site-forge/). Design + hostile-case analysis:
+[docs/rfc-nested.md](docs/rfc-nested.md).
+
 Every make feature doing real work here — sentinel `.done` targets, order-only
-prerequisites, the `$$` two-pass escape, `-j` as a free agent scheduler — is
-documented with verbatim excerpts in
-[docs/engine-internals.md](docs/engine-internals.md).
+prerequisites, the `$$` two-pass escape, `-j` as a free agent scheduler,
+command-line variable origin beating a child's `?=` — is documented with
+verbatim excerpts in [docs/engine-internals.md](docs/engine-internals.md).
 
 ## Evals: agents lie, files don't
 
@@ -242,8 +258,9 @@ pi sessions know how to scaffold and drive the pipeline.
 Lives on the [Backlog.md board](backlog/tasks/) (`backlog board` to view) —
 which is also the engine's work queue, so any item below is one
 `make board-next` away from being attempted: retry-with-feedback loops,
-nested decomposition via recursive make, planner JSON output hardening,
-per-artifact token accounting, persistent CDP screenshot pool, and more.
+planner JSON output hardening, per-artifact token accounting, persistent CDP
+screenshot pool, and more. (Nested decomposition graduated off this list —
+see [demos/site-forge](demos/site-forge/).)
 
 ## Honest limitations
 
@@ -255,8 +272,12 @@ per-artifact token accounting, persistent CDP screenshot pool, and more.
 - **HITL approvals are designed, not default.** `engine/build.mk` ships with
   `.done → .done` edges; wiring the `.ok` layer is a one-line jq change plus
   the documented pattern rules.
-- **Flat DAG.** One level of decomposition, fan-out capped at 8. A component
-  that should itself be a project stays one agent's problem.
+- **Sibling integration is copy-based.** Nested decomposition landed (composite
+  components recurse, depth ≤ 3, fan-out ≤ 8 per level), but siblings integrate
+  by copying each other's files per the plan's description contract — no shared
+  artifact store, so a subtree can drift from the sibling it copied. And the
+  composite-marking decision has exactly one real-PRD validation datapoint
+  (site-forge) so far.
 - **Tool-less planners can roleplay.** Deny tools to a planning agent and
   hand it a goal that references files, and it may hallucinate an entire
   tool-call transcript before the JSON (observed on the self-host run — the

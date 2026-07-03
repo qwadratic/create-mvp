@@ -20,6 +20,12 @@ GOAL ?= goal.md
 include engine/build.mk
 ```
 
+## Docs
+
+- [Engine internals](docs/engine-internals.md) — the make features doing the work (`.DELETE_ON_ERROR`, `-include` restart, sentinel targets, `-j` scheduling, resume) and why each earns its place
+- [Evals](docs/evals.md) — snap / evalshot / apieval / TUI goldens / wfcheck / matrix: when each fires, and the golden update protocol
+- [Effort & HITL](docs/effort-and-hitl.md) — the effort classifier tiers and the single human-in-the-loop switch (`approvals/<step>.ok`, `AUTOPILOT=1`)
+
 ## Quickstart
 
 ```

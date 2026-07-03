@@ -64,6 +64,13 @@ progress:
 	pct=$$((done*100/total)); n=$$((done*24/total)); \
 	bar=""; [ $$n -gt 0 ] && bar=$$(printf '#%.0s' $$(seq 1 $$n)); \
 	printf '[%-24s] %d/%d (%d%%)\n' "$$bar" $$done $$total $$pct
+# nested: per-level bars, no global rollup — merged percent across unequal-cost
+# subtrees would lie; "not scaffolded" = honest rendering of lazy planning
+	@for d in $$(jq -r '.components[] | select((.kind // "leaf")=="composite") | .id' $(B)/plan.json 2>/dev/null); do \
+	  [ -f $(SRC)/$$d/Makefile ] || { printf ' \033[2m·\033[0m %s (subtree, not scaffolded)\n' $$d; continue; }; \
+	  echo " └─ $$d:"; \
+	  $(MAKE) -s -C $(SRC)/$$d progress | sed 's/^/    /'; \
+	done
 
 # ponytail: awk-parsed mermaid; ceiling = pattern/order-only deps; upgrade = makefile2graph
 graph:
@@ -71,6 +78,15 @@ graph:
 	awk -F: '/^[a-zA-Z$$(][^=]*:([^=]|$$)/ && $$1!~/PHONY|DELETE_ON_ERROR/ \
 	  {t=$$1; n=split($$2,d," "); for(i=1;i<=n;i++) if(d[i]!="|") printf "  %s --> %s\n", d[i], t}' \
 	  $(ENGINE)build.mk $(B)/components.mk 2>/dev/null | sed -e 's/$$(B)/$(B)/g' -e 's/$$(GOAL)/$(GOAL)/g'
+# nested: subgraph per composite; sed namespaces child node ids or mermaid
+# merges identically-named nodes across subtrees; last edge shows the bubble
+	@for d in $$(jq -r '.components[] | select((.kind // "leaf")=="composite") | .id' $(B)/plan.json 2>/dev/null); do \
+	  [ -f $(SRC)/$$d/Makefile ] || continue; \
+	  echo "  subgraph $$d"; \
+	  $(MAKE) -s -C $(SRC)/$$d graph | tail -n +2 | sed -e "s|build/|$$d/build/|g" -e "s|^  goal.md|  $$d/goal.md|" -e 's/^/  /'; \
+	  echo "  end"; \
+	  echo "  $$d/build/report.md --> $(B)/$$d.done"; \
+	done
 
 clean:
 	rm -rf $(B) $(SRC)

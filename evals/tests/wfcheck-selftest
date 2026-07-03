@@ -1,22 +1,67 @@
 #!/usr/bin/env bash
 # wfcheck-selftest — expects PASS on known-good engine run, FAIL on broken copies.
-# Known-good reference: makefile-lab/twitter (prior art, complete run committed).
+# Nested cases (5–7) use a synthetic self-contained fixture; flat cases (1–4)
+# need the known-good reference: makefile-lab/twitter (prior art, complete run).
 set -euo pipefail
 DIR=$(cd "$(dirname "$0")/.." && pwd)   # evals/
+ENGINE=$(cd "$DIR/../engine" && pwd)
 REF=${REF:-/Users/gerhardgustav/Desktop/hobby-dev/avax/makefile-lab/twitter}
-[ -d "$REF" ] || { echo "wfcheck-selftest: SKIP — reference run not found: $REF" >&2; exit 0; }
 
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 fail() { echo "wfcheck-selftest: FAIL — $1" >&2; exit 1; }
 
+# ── nested fixture: parent (leaf lib + composite app) → subtree app (leaf core)
+mkleaf() {  # mkleaf <projdir> <id> — verified leaf: src + passing check.sh + sentinel
+  mkdir -p "$1/src/$2" "$1/build"
+  echo data > "$1/src/$2/main.txt"
+  printf '#!/bin/bash\nexit 0\n' > "$1/src/$2/check.sh"; chmod +x "$1/src/$2/check.sh"
+  touch "$1/build/$2.done"
+}
+N=$TMP/nested
+mkleaf "$N" lib
+jq -n '{components:[{id:"lib",desc:"leaf lib",deps:[]},
+                    {id:"app",desc:"app subtree",deps:["lib"],kind:"composite",sub_goal:"build the app"}]}' \
+  > "$N/build/plan.json"
+printf 'VERDICT: PASS\n' > "$N/build/report.md"
+touch "$N/build/app.done"
+# composite = full nested project at src/app/ (scaffold shape per rfc-nested §2)
+mkleaf "$N/src/app" core
+jq -n '{components:[{id:"core",desc:"core leaf",deps:[]}]}' > "$N/src/app/build/plan.json"
+printf 'VERDICT: PASS\n' > "$N/src/app/build/report.md"
+echo "build the app" > "$N/src/app/goal.md"
+printf 'GOAL ?= goal.md\ninclude %s/build.mk\n' "$ENGINE" > "$N/src/app/Makefile"
+printf '#!/bin/bash\ncd "$(dirname "$0")" && grep -q "^VERDICT: PASS$" build/report.md\n' > "$N/src/app/check.sh"
+chmod +x "$N/src/app/check.sh"
+
+# 5. nested good: parent passes, subtree recursed, drill-down map present
+"$DIR/wfcheck" "$N" >/dev/null || fail "nested good run did not pass"
+jq -e '(.checks[] | select(.name=="subtree:app") | .pass) and .subtrees.app.score == 1' \
+  "$N/build/wfscore.json" >/dev/null || fail "subtree:app not recorded/scored in parent wfscore"
+jq -e '.score == 1 and (has("subtrees") | not)' "$N/src/app/build/wfscore.json" >/dev/null \
+  || fail "child wfscore.json missing, or flat child gained subtrees key"
+
+# 6. broken grandchild: delegating check.sh still greps PASS — only recursion catches it
+printf '#!/bin/bash\nexit 1\n' > "$N/src/app/src/core/check.sh"
+"$DIR/wfcheck" "$N" >/dev/null 2>&1 && fail "broken grandchild not caught"
+jq -e '(.checks[] | select(.name=="subtree:app") | .pass == false) and (.subtrees.app.score < 1)' \
+  "$N/build/wfscore.json" >/dev/null || fail "subtree:app not blamed for grandchild break"
+
+# 7. unscaffolded composite (lazy planning mid-flight): honest FAIL, no crash
+rm -rf "$N/src/app"
+"$DIR/wfcheck" "$N" >/dev/null 2>&1 && fail "missing subtree dir not caught"
+jq -e '.checks[] | select(.name=="subtree:app") | (.pass == false) and (.detail | test("did not produce"))' \
+  "$N/build/wfscore.json" >/dev/null || fail "unscaffolded subtree not blamed"
+
+# ── flat cases against the known-good reference run
+[ -d "$REF" ] || { echo "wfcheck-selftest: PASS (nested only) — flat SKIP, reference not found: $REF" >&2; exit 0; }
 # work on a copy: keep prior art pristine (wfcheck writes build/wfscore.json)
 cp -R "$REF" "$TMP/good"
 
-# 1. known-good run passes, score 1
+# 1. known-good run passes, score 1, wfscore schema unchanged (no subtrees key)
 "$DIR/wfcheck" "$TMP/good" || fail "known-good run did not pass"
-jq -e '.score == 1 and .passed == .total' "$TMP/good/build/wfscore.json" >/dev/null \
-  || fail "good run score != 1"
+jq -e '.score == 1 and .passed == .total and (has("subtrees") | not)' "$TMP/good/build/wfscore.json" >/dev/null \
+  || fail "good run score != 1 (or flat wfscore gained subtrees key)"
 
 # 2. broken: missing .done stamp (census incomplete)
 cp -R "$REF" "$TMP/broken-census"
@@ -41,4 +86,4 @@ sed -i '' 's/VERDICT: PASS/VERDICT: FAIL/' "$TMP/broken-gates/build/report.md"
 jq -e '([.checks[] | select(.name=="run:web-ui" or .name=="review-verdict") | .pass] | all(. == false))' \
   "$TMP/broken-gates/build/wfscore.json" >/dev/null || fail "run/verdict checks not blamed"
 
-echo "wfcheck-selftest: PASS (good=pass; census, dag-cycle, gate/verdict breaks all caught)"
+echo "wfcheck-selftest: PASS (good=pass; census, dag-cycle, gate/verdict, nested-subtree breaks all caught)"

@@ -12,6 +12,7 @@ proj=$1
 [ -d "$proj" ] || { echo "wfcheck: no such dir: $proj" >&2; exit 2; }
 command -v jq >/dev/null || { echo "wfcheck: jq not found" >&2; exit 2; }
 B=${B:-build} SRC=${SRC:-src} CHECK_TIMEOUT=${CHECK_TIMEOUT:-90}
+self=$(cd "$(dirname "$0")" && pwd)/$(basename "$0")   # for subtree recursion after cd
 cd "$proj"
 plan=$B/plan.json
 
@@ -99,6 +100,21 @@ for id in $(jq -r '.components[]?.id // empty' "$plan" 2>/dev/null); do
   fi
 done
 
+# ── subtree recursion: composite component == nested agentmake project at $SRC/<id>/.
+# One check per subtree at this level (no flat summing — a fanout-8 subtree would
+# dilute the parent score); drill-down lives in the child's own wfscore.json,
+# surfaced via .subtrees below. Parent PASS requires every subtree PASS, recursively.
+subs='{}'
+for id in $(jq -r '.components[]? | select((.kind // "leaf")=="composite") | .id' "$plan" 2>/dev/null); do
+  if "$self" "$SRC/$id" >/dev/null 2>&1; then
+    record "subtree:$id" 1 "$(jq -r '"\(.passed)/\(.total) score \(.score)"' "$SRC/$id/$B/wfscore.json")"
+  else
+    record "subtree:$id" 0 "$(jq -r '"\(.passed)/\(.total) score \(.score)"' "$SRC/$id/$B/wfscore.json" 2>/dev/null || echo 'subtree wfcheck did not produce wfscore.json')"
+  fi
+  sw=$SRC/$id/$B/wfscore.json
+  [ -f "$sw" ] && subs=$(jq --arg id "$id" --slurpfile s "$sw" '. + {($id): ($s[0] | {score,passed,total})}' <<<"$subs")
+done
+
 # ── review gate
 if grep -q '^VERDICT: PASS$' "$B/report.md" 2>/dev/null; then
   record review-verdict 1 "$B/report.md has VERDICT: PASS"
@@ -110,6 +126,10 @@ fi
 mkdir -p "$B"
 jq -s '{checks:., passed:(map(select(.pass))|length), total:length}
        | .score = ((.passed/.total*100|round)/100)' "$results" > "$B/wfscore.json"
+if [ "$subs" != "{}" ]; then   # flat projects: no rewrite, wfscore.json byte-identical
+  jq --argjson subs "$subs" '. + {subtrees: $subs}' "$B/wfscore.json" > "$B/wfscore.json.tmp" \
+    && mv "$B/wfscore.json.tmp" "$B/wfscore.json"
+fi
 
 passed=$(jq -r .passed "$B/wfscore.json") total=$(jq -r .total "$B/wfscore.json")
 score=$(jq -r .score "$B/wfscore.json")

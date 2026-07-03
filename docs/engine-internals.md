@@ -134,3 +134,98 @@ never rebuilt; the failed one (deleted by `.DELETE_ON_ERROR`) restarts; the
 untouched remainder proceeds. There is no "resume mode" because resuming is
 the default behavior of the tool. `make clean` (`rm -rf build/ src/`) is the
 only way to start over, deliberately.
+
+## Recursive `+$(MAKE)` — composite components as nested projects
+
+One planning call cannot foresee a big build. So a plan component may declare
+`"kind": "composite"` with a `sub_goal`, and instead of one giant agent
+session it becomes a *complete nested project* at `src/<id>/` — its own
+`goal.md`, its own three-line Makefile including the same `build.mk`, its own
+classify → plan → build → review pipeline. The design is documented in full in
+[`rfc-nested.md`](rfc-nested.md); this section covers the make machinery that
+makes it work. A generated composite rule looks like this:
+
+```make
+build/api-layer.done: build/plan.json build/schema.done
+	$(ENGINE)subtree api-layer
+	+$(MAKE) -C src/api-layer GOAL=goal.md B=build SRC=src AGENTMAKE_DEPTH=1 MAXTIER=$$(jq -r .tier build/effort.json) all
+	bash src/api-layer/check.sh
+	touch $@
+```
+
+Every token on the `+$(MAKE)` line is load-bearing.
+
+**The `+` prefix and the jobserver.** GNU make coordinates parallelism across
+recursive invocations through a *jobserver*: a shared token pipe whose file
+descriptors are handed down via `MAKEFLAGS`. The `+` marks the line as a
+recursive make, which is what grants the child access to those descriptors
+(and runs the line even under `-n`/`-q` dry runs). The consequence is that a
+single `-j4` at the top of the tree budgets agent parallelism for the *entire*
+nested run — no `-jN` appears at any nested level, and a parent releases its
+own job token while its sub-make runs, so composite recipes don't pin slots
+while waiting on their subtrees. Using the `$(MAKE)` variable rather than a
+literal `make` is part of the same contract: it is how `MAKEFLAGS` plumbing
+and jobserver inheritance are activated.
+
+**Variables ride the command line, not the environment.** The depth counter
+(`AGENTMAKE_DEPTH=1`) and effort ceiling (`MAXTIER=…`) are passed as
+command-line assignments, and that choice is about make's variable-origin
+precedence. The child's own `AGENTMAKE_DEPTH ?= 0` would be silently skipped
+if the value arrived through the environment — `?=` only assigns when the
+variable is undefined, and an environment variable counts as defined — so an
+exported depth would *never increment* and the depth bound would be dead code.
+Command-line origin is the strongest there is: it survives the child's `?=`,
+and it also beats assignments propagated through `MAKEFLAGS` from levels
+above. The same line pins `GOAL=goal.md B=build SRC=src` so a parent running
+with non-default paths cannot leak them into its children.
+
+**`.DELETE_ON_ERROR` is per-instance, and that's the point.** The directive's
+scope is one make instance, and recursion gives each subtree its own. When a
+grandchild's gate fails, the grandchild's instance deletes the grandchild's
+artifacts; the child's `all` fails; that non-zero exit fails the parent's
+composite recipe *before* `touch $@`, so the parent sentinel is simply never
+created — there is nothing partial for the parent to clean up. Failure
+bubbles up N levels with zero new mechanism, just exit codes crossing make
+boundaries, and `make[2]: *** [target] Error 1` breadcrumbs naming each level
+on the way. The sentinel invariant survives recursion intact: the delegating
+`check.sh` scaffolded into each subtree re-checks the child review's
+`VERDICT: PASS`, so a parent `.done` still exists if and only if the component
+was built *and* verified — it just means "the whole subtree" now.
+
+**A `cmp` guard preserves resume across the boundary.** The `subtree` helper
+rewrites a child's `goal.md` only when the planned `sub_goal` text actually
+changed, comparing with `cmp` before moving the new file into place. An
+unchanged goal keeps its old mtime, so a re-invoked parent descends into the
+child and finds everything up to date — the child resumes at its first
+missing artifact instead of replanning from scratch. Timestamp semantics, the
+same trick `board.mk` uses, stretched across a process boundary.
+
+## Nested census — the tools recurse with the tree
+
+Progress, graph, and wfcheck all follow the recursion, each with the smallest
+mechanism that stays truthful.
+
+`make progress` prints the parent's own bar, then walks the plan's composite
+components and runs `$(MAKE) -s -C src/<id> progress` for each, indenting the
+child's output. There is deliberately *no* merged whole-tree percentage: a
+single number averaging levels of wildly unequal cost would lie, so each level
+reports its own bar. A composite that is planned but not yet scaffolded prints
+as `(subtree, not scaffolded)` — the honest rendering of lazy planning, since
+an unplanned subtree has no leaf count yet to report against.
+
+`make graph` wraps each subtree's diagram in a mermaid `subgraph` block and
+prefixes the child's node ids with the component id (`build/plan.json` →
+`api-layer/build/plan.json`). Without that namespacing mermaid would merge
+identically-named nodes from different subtrees into one. A final edge from
+the child's `report.md` to the parent's `.done` sentinel draws the verdict
+bubble into the picture.
+
+`wfcheck` re-invokes itself on each composite's directory — a subtree is
+indistinguishable from a top-level project, so the same script applies
+unchanged. Each subtree contributes exactly *one* check (`subtree:<id>`) to
+its parent's score rather than flattening its own checks upward, so a
+wide subtree cannot dilute a small parent's score; a parent passes only if
+every subtree passes, recursively. Drill-down is preserved because every level
+writes its own `build/wfscore.json`, and the parent's file carries a
+`subtrees` summary map pointing at them. Flat projects hit none of these code
+paths — their output stays byte-identical.

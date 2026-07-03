@@ -1,0 +1,24 @@
+habits  (j/k move, space toggle, a add, q quit)
+
+[x] exercise  cur:3 best:3
+[x] meditate  cur:1 best:1
+[ ] read  cur:4 best:4
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

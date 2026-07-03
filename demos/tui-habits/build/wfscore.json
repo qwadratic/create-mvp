@@ -1,0 +1,127 @@
+{
+  "checks": [
+    {
+      "name": "plan-exists",
+      "pass": true,
+      "detail": "build/plan.json parses"
+    },
+    {
+      "name": "plan-schema",
+      "pass": true,
+      "detail": "components[] each have id/desc/deps"
+    },
+    {
+      "name": "dag-valid",
+      "pass": true,
+      "detail": "deps acyclic, all ids resolve"
+    },
+    {
+      "name": "src:habit-store",
+      "pass": true,
+      "detail": "src/habit-store non-empty"
+    },
+    {
+      "name": "checksh:habit-store",
+      "pass": true,
+      "detail": "src/habit-store/check.sh executable"
+    },
+    {
+      "name": "run:habit-store",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:habit-store",
+      "pass": true,
+      "detail": "build/habit-store.done present"
+    },
+    {
+      "name": "src:streak-logic",
+      "pass": true,
+      "detail": "src/streak-logic non-empty"
+    },
+    {
+      "name": "checksh:streak-logic",
+      "pass": true,
+      "detail": "src/streak-logic/check.sh executable"
+    },
+    {
+      "name": "run:streak-logic",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:streak-logic",
+      "pass": true,
+      "detail": "build/streak-logic.done present"
+    },
+    {
+      "name": "src:render-view",
+      "pass": true,
+      "detail": "src/render-view non-empty"
+    },
+    {
+      "name": "checksh:render-view",
+      "pass": true,
+      "detail": "src/render-view/check.sh executable"
+    },
+    {
+      "name": "run:render-view",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:render-view",
+      "pass": true,
+      "detail": "build/render-view.done present"
+    },
+    {
+      "name": "src:cli-commands",
+      "pass": true,
+      "detail": "src/cli-commands non-empty"
+    },
+    {
+      "name": "checksh:cli-commands",
+      "pass": true,
+      "detail": "src/cli-commands/check.sh executable"
+    },
+    {
+      "name": "run:cli-commands",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:cli-commands",
+      "pass": true,
+      "detail": "build/cli-commands.done present"
+    },
+    {
+      "name": "src:tui-loop",
+      "pass": true,
+      "detail": "src/tui-loop non-empty"
+    },
+    {
+      "name": "checksh:tui-loop",
+      "pass": true,
+      "detail": "src/tui-loop/check.sh executable"
+    },
+    {
+      "name": "run:tui-loop",
+      "pass": true,
+      "detail": "check.sh exit 0"
+    },
+    {
+      "name": "done:tui-loop",
+      "pass": true,
+      "detail": "build/tui-loop.done present"
+    },
+    {
+      "name": "review-verdict",
+      "pass": true,
+      "detail": "build/report.md has VERDICT: PASS"
+    }
+  ],
+  "passed": 24,
+  "total": 24,
+  "score": 1
+}

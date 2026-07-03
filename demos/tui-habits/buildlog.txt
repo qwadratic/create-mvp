@@ -1,0 +1,68 @@
+mkdir -p build
+../../engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+../../engine/agent plan goal.md > build/plan.json
+jq -e '.components | length > 0' build/plan.json > /dev/null   # gate: valid decomposition
+jq -r '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n\t$(AGENT) build \(.id)\n\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+../../engine/agent build habit-store
+Done. Files:
+
+- `src/habit-store/store.py` — `load`/`save` (stdlib json), `add_habit` (rejects dup/empty names), `mark_done` (rejects unknown habit, dup same-day mark; keeps dates sorted). `DEFAULT_PATH` overridable via `HABITS_FILE` env for sibling components.
+- `src/habit-store/test_store.py` — adds, marks, checks all rejection paths, saves, reloads, asserts exact state.
+- `src/habit-store/check.sh` — executable, runs self-test, exits 0. Verified passing.
+
+ponytail: habits dict passed explicitly (pure functions + load/save), no class — siblings just `import store`.
+bash src/habit-store/check.sh
+habit-store: OK
+touch build/habit-store.done
+../../engine/agent build streak-logic
+Done.
+
+- `src/streak-logic/streaks.py` — `current_streak(dates, today)` (accepts iso string or `date`; alive if today or yesterday marked), `best_streak(dates)`. Dedup + sort internal, gaps handled.
+- `src/streak-logic/test_streaks.py` — fixed-date fixtures: empty, alive-via-yesterday, dead, gaps, dups, best≠current.
+- `src/streak-logic/check.sh` — executable, runs tests, exits 0. Passed.
+bash src/streak-logic/check.sh
+streak-logic: all tests passed
+touch build/streak-logic.done
+../../engine/agent build render-view
+Done.
+
+- `src/render-view/view.py` — `render(habits, today) -> str`: bold header, green `[x]` / dim `[ ]` done marker, current/best streak via streak-logic; `--render` CLI loads store (respects `HABITS_FILE`), prints, exits 0.
+- `src/render-view/test_view.py` — fixture render assertions + subprocess `--render` against temp store.
+- `src/render-view/check.sh` — runs self-test; passes.
+
+ponytail: sibling imports via `sys.path.insert` — fine for flat src layout; upgrade path is a proper package if project ever installs.
+bash src/render-view/check.sh
+render-view: all tests passed
+touch build/render-view.done
+../../engine/agent build cli-commands
+Done. Files under `src/cli-commands/`:
+
+- `cli.py` — argparse CLI: `add NAME`, `done NAME`, `--render`. Reuses `store.py` and `view.render` via sys.path (same pattern as render-view). Errors print `error: ...` to stderr, exit 1; no args → usage, exit 2. Data file via `HABITS_FILE` env (store convention).
+- `test_cli.py` — subprocess self-test against temp file: add, dup add, done, dup done, unknown habit, persisted JSON, `--render` output, exit codes.
+- `check.sh` — runs test, exits 0. Verified passing.
+
+ponytail: `HABITS_FILE` resolved at store import time — fine for subprocess tests, upgrade path is a `--file` flag if in-process config needed.
+bash src/cli-commands/check.sh
+cli-commands: all tests passed
+touch build/cli-commands.done
+../../engine/agent build tui-loop
+Done. Files under `src/tui-loop/`:
+
+- **tui.py** — logic/I-O split. Pure part: `new_state`, `handle_key(state, key, prompt)`, `toggle_done`, `add_habit` (reuses `store.add_habit` for dup/empty validation), `build_rows` (uses `current_streak`/`best_streak`, same `[x]`/`[ ]` markers as render-view). Curses part isolated in `_loop`/`_prompt`/`main`, curses imported lazily so import never touches terminal.
+- **test_tui.py** — non-interactive: drives j/k clamping, space toggle add/remove of today, `a` add via injected prompt callable, duplicate rejection message, row markers + streaks, quit, empty-state no-ops.
+- **check.sh** — runs test, exits 0. Verified passing.
+
+ponytail: space toggle unmarks by list removal directly (store has no unmark API); upgrade path = add `unmark_done` to store if other components need it.
+bash src/tui-loop/check.sh
+tui-loop: OK
+touch build/tui-loop.done
+../../engine/agent review > build/report.md
+grep -q 'VERDICT: PASS' build/report.md
+EXIT: 0
+
+── TUI evals: tmux capture-pane text goldens (evals/tui-check.sh) ──
+PASS: 01-render
+PASS: 02-tui-initial
+PASS: 03-tui-toggle
+wfcheck: PASS 24/24 checks (score 1) — .

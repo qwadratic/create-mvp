@@ -1,4 +1,13 @@
-# agentmake engine — goal.md → plan → components (parallel, dep-ordered) → review gate
+# agentmake engine — goal.md → effort → plan → components (parallel, dep-ordered) → review gate
+#
+# Effort classifier (Phase 0): agent effort ∝ user effort in goal.md.
+#   tier     | fanout | review_depth | model_hint | thinking
+#   vague    | 2-3    | smoke        | small      | low
+#   standard | 3-5    | standard     | default    | medium
+#   prd      | 5-8    | full         | large      | high
+# Consumption: fanout → plan prompt component count; model_hint/thinking →
+#   pi flags (--model via MODEL_SMALL/MODEL_LARGE env, --thinking direct);
+#   review_depth → review rubric (smoke: check.sh only … full: evals mandatory).
 #
 # Project Makefile is 3 lines:
 #   GOAL ?= goal.md        # optional overrides: GOAL, B, SRC, AGENT
@@ -18,8 +27,13 @@ export GOAL B SRC   # agent adapter reads these
 
 all: $(B)/report.md
 
+# ── Phase 0: effort classification (cheap call; gates whole pipeline)
+$(B)/effort.json: $(GOAL) | $(B)
+	$(AGENT) classify $< > $@
+	jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' $@ > /dev/null   # gate: schema
+
 # ── Phase 1: decomposition (agent, no tools)
-$(B)/plan.json: $(GOAL) | $(B)
+$(B)/plan.json: $(GOAL) $(B)/effort.json
 	$(AGENT) plan $< > $@
 	jq -e '.components | length > 0' $@ > /dev/null   # gate: valid decomposition
 
@@ -29,7 +43,9 @@ $(B)/components.mk: $(B)/plan.json
 	jq -r '.components[] | "$(B)/\(.id).done: $(B)/plan.json \(.deps | map("$(B)/\(.).done") | join(" "))\n\t$$(AGENT) build \(.id)\n\tbash $(SRC)/\(.id)/check.sh\n\ttouch $$@\nCOMPONENTS += $(B)/\(.id).done\n"' $< > $@
 
 # ── Phase 3: reviewer agent gate
-$(B)/report.md: $(COMPONENTS)
+# components.mk prereq: without it, a failed plan/effort gate leaves COMPONENTS
+# empty and review would run against nothing (-include hides remake failure)
+$(B)/report.md: $(B)/components.mk $(COMPONENTS)
 	$(AGENT) review > $@
 	grep -q 'VERDICT: PASS' $@
 
@@ -37,7 +53,7 @@ $(B):
 	mkdir -p $@
 
 # ── Observability
-ARTIFACTS = $(B)/plan.json $(COMPONENTS) $(B)/report.md
+ARTIFACTS = $(B)/effort.json $(B)/plan.json $(COMPONENTS) $(B)/report.md
 progress:
 	@done=0; total=0; \
 	for f in $(ARTIFACTS); do \

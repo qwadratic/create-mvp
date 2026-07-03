@@ -1,11 +1,24 @@
 #!/bin/bash
-# adapter: Makefile <-> pi harness. Roles: plan | build <id> | review
-# Prompts live in prompts/*.md as ${VAR} templates (python string.Template).
-# Swap point: replace PI array for claude -p / other harness.
+# adapter: Makefile <-> agent runtime. Roles: classify <goal> | plan <goal> | build <id> | review
+#
+# RUNTIME=cli (default) | sdk
+#   cli: ENGINE_CLI=pi (default) | claude; ENGINE_CLI_FLAGS appended verbatim
+#   sdk: node runtime-sdk.mjs (pi agentic-loop SDK, same contract)
+# Every call injects prompts/system.md (caveman+ponytail build style).
+#
+# Effort knobs: $B/effort.json — written by `classify` role (goal-level), e.g.
+#   {"tier":"prd","fanout":"5-8","review_depth":"full","model_hint":"large","thinking":"high"}
+#   model_hint small/large → MODEL_SMALL/MODEL_LARGE env (unset → provider default)
+# Optional hand-authored per-unit overrides may coexist in the same file:
+#   {"default":"med",
+#    "units":{"plan":"high","<component-id>":"low"},
+#    "tiers":{"med":{"model":"provider/id","thinking":"medium"}}}
+# thinking levels: off minimal low medium high xhigh (pi); mapped to --effort for claude.
 set -euo pipefail
 DIR=$(cd "$(dirname "$0")" && pwd)
-PI=(pi -p --no-session --no-context-files --no-skills --no-prompt-templates --no-extensions)
 B=${B:-build} SRC=${SRC:-src}
+RUNTIME=${RUNTIME:-cli}
+ENGINE_CLI=${ENGINE_CLI:-pi}
 
 render() {  # render <prompt.md> — substitutes ${VARS} from environment
   python3 -c 'import sys,os
@@ -13,22 +26,100 @@ from string import Template
 print(Template(open(sys.argv[1]).read()).safe_substitute(os.environ))' "$DIR/prompts/$1"
 }
 
+knob() {  # knob <field> <default> — goal-level knob from $B/effort.json
+  jq -r --arg d "$2" ".$1 // \$d" "$B/effort.json" 2>/dev/null || echo "$2"
+}
+
+effort() {  # effort <unit> — sets MODEL/THINKING; goal-level knobs, units/tiers override
+  MODEL='' THINKING=''
+  local f="$B/effort.json" t
+  [ "$1" = classify ] && return 0   # classify bootstraps effort.json — stays cheap
+  [ -f "$f" ] || return 0
+  THINKING=$(jq -r '.thinking // empty' "$f")
+  case $(jq -r '.model_hint // empty' "$f") in
+    small) MODEL=${MODEL_SMALL:-} ;;
+    large) MODEL=${MODEL_LARGE:-} ;;
+  esac
+  t=$(jq -r --arg u "$1" '.units[$u] // .default // empty' "$f")
+  [ -n "$t" ] || return 0
+  MODEL=$(jq -r --arg t "$t" --arg m "$MODEL" '.tiers[$t].model // $m' "$f")
+  THINKING=$(jq -r --arg t "$t" --arg k "$THINKING" '.tiers[$t].thinking // $k' "$f")
+}
+
+claude_effort() {  # map pi thinking level -> claude --effort (off -> no flag)
+  case $1 in
+    minimal|low) echo low ;;
+    medium)      echo medium ;;
+    high)        echo high ;;
+    xhigh)       echo xhigh ;;
+    *)           echo '' ;;
+  esac
+}
+
+run() {  # run <unit> <tools:yes|no> <prompt>
+  local unit=$1 tools=$2 prompt=$3
+  effort "$unit"
+  if [ "$RUNTIME" = sdk ]; then
+    ENGINE_MODEL=$MODEL ENGINE_THINKING=$THINKING \
+    ENGINE_NO_TOOLS=$([ "$tools" = no ] && echo 1 || echo '') \
+      node "$DIR/runtime-sdk.mjs" <<<"$prompt"
+    return
+  fi
+  local cmd ce
+  case $ENGINE_CLI in
+    pi)
+      cmd=(pi -p --no-session --no-context-files --no-skills --no-prompt-templates
+           --no-extensions --append-system-prompt "$DIR/prompts/system.md")
+      [ "$tools" = no ] && cmd+=(--no-tools)
+      [ -n "$MODEL" ] && cmd+=(--model "$MODEL")
+      [ -n "$THINKING" ] && cmd+=(--thinking "$THINKING")
+      ;;
+    claude)
+      cmd=(claude -p --append-system-prompt "$(cat "$DIR/prompts/system.md")")
+      [ "$tools" = no ] && cmd+=(--tools "")
+      [ -n "$MODEL" ] && cmd+=(--model "$MODEL")
+      if [ -n "$THINKING" ]; then
+        ce=$(claude_effort "$THINKING")
+        [ -n "$ce" ] && cmd+=(--effort "$ce")
+      fi
+      ;;
+    *) echo "unknown ENGINE_CLI: $ENGINE_CLI (pi|claude)" >&2; exit 1 ;;
+  esac
+  # shellcheck disable=SC2206  # deliberate word split: flag passthrough
+  cmd+=(${ENGINE_CLI_FLAGS:-})
+  if [ "$ENGINE_CLI" = claude ]; then
+    "${cmd[@]}" <<<"$prompt"   # stdin: claude variadic flags (--tools) eat positional args
+  else
+    "${cmd[@]}" "$prompt"
+  fi
+}
+
 role=$1; shift
 case $role in
+  classify)
+    export GOAL_TEXT="$(cat "$1")"
+    run classify no "$(render classify.md)" | sed '/^```/d'
+    ;;
   plan)
-    GOAL_TEXT=$(cat "$1") "${PI[@]}" --no-tools "$(render plan.md)" | sed '/^```/d'
+    export GOAL_TEXT="$(cat "$1")" FANOUT="$(knob fanout "3-5")"
+    run plan no "$(render plan.md)" | sed '/^```/d'
     ;;
   build)
     id=$1
-    ID=$id \
-    DESC=$(jq -r --arg id "$id" '.components[] | select(.id==$id) | .desc' "$B/plan.json") \
-    GOAL_TEXT=$(cat "${GOAL:-goal.md}") \
-    SIBLINGS=$(ls "$SRC" 2>/dev/null | tr '\n' ' ' || echo none) \
-    SRC=$SRC \
-    "${PI[@]}" "$(render build.md)"
+    export ID="$id" B SRC \
+      DESC="$(jq -r --arg id "$id" '.components[] | select(.id==$id) | .desc' "$B/plan.json")" \
+      GOAL_TEXT="$(cat "${GOAL:-goal.md}")" \
+      SIBLINGS="$(ls "$SRC" 2>/dev/null | tr '\n' ' ' || echo none)"
+    run "$id" yes "$(render build.md)"
     ;;
   review)
-    GOAL_FILE=${GOAL:-goal.md} SRC=$SRC "${PI[@]}" "$(render review.md)"
+    case $(knob review_depth standard) in
+      smoke) RUBRIC="Smoke check only: run each $SRC/*/check.sh; verdict from exit codes, skip code inspection and evals." ;;
+      full)  RUBRIC="Full review: inspect all code, run each $SRC/*/check.sh, verify every acceptance criterion and edge case from the goal. Evals mandatory: run visual/TUI evals where applicable; missing or failing evals = FAIL." ;;
+      *)     RUBRIC="Inspect code, run each $SRC/*/check.sh." ;;
+    esac
+    export GOAL_FILE="${GOAL:-goal.md}" SRC RUBRIC
+    run review yes "$(render review.md)"
     ;;
   *) echo "unknown role: $role" >&2; exit 1 ;;
 esac

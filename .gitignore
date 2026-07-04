@@ -17,3 +17,6 @@ demoscene/out/
 # mock demo run products (regenerate: make demo-mock)
 demos/mock/build/
 demos/mock/src/
+
+# pi session logs — runtime data, keep local only
+evals/matrix-runs/**/.sessions/

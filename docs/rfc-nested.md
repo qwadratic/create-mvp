@@ -5,7 +5,7 @@ replaces scratch RFCs nested-A (recursive make) and nested-B
 (flatten-at-generate).
 
 > Post-implementation note: the per-subtree classify *agent* described below
-> was later replaced by an explicit `TIER` param (`--budget`); the MAXTIER
+> was since replaced by an explicit `TIER` param (`--budget`, d4d5def); the MAXTIER
 > clamp survives as a deterministic jq rule in `engine/build.mk`. §5b/§6
 > record the agent-era mechanics.
 

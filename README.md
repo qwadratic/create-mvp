@@ -121,7 +121,7 @@ you, or by hand:
 mkdir my-thing && cd my-thing
 echo "a pomodoro timer, keyboard only" > goal.md
 printf 'GOAL ?= goal.md\ninclude ../create-mvp/engine/build.mk\n' > Makefile
-make -j4
+make -j4 TIER=s      # one-liner goal, small budget (same dial as --budget)
 ```
 
 ## How it works

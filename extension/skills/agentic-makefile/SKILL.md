@@ -15,7 +15,7 @@ exactly where it stopped.
 
 ## Workflow
 
-1. **Classify effort** (table below). Trivial → skip the engine, just do it.
+1. **Triage effort** (table below). Trivial → skip the engine, just do it.
 2. **Scaffold** a project dir:
    - `goal.md` — plain prose, one paragraph. Concrete deliverables + constraints.
    - `Makefile`:
@@ -27,8 +27,10 @@ exactly where it stopped.
      repo. Outside the repo: copy or symlink `engine/` next to the project and use
      `include engine/build.mk`.
      Shortcut: `bin/create-mvp "goal text"` (the repo's one-shot CLI) does steps 2–3 —
-     scaffolds goal.md + Makefile, runs the pipeline.
-3. **Run**: `make -C <dir> -j4 all`.
+     scaffolds goal.md + Makefile, runs the pipeline. Effort is an explicit knob:
+     `--budget s|m|l` (default `m`; `--tier` is a legacy alias).
+3. **Run**: `make -C <dir> -j4 all` (effort knob on the make side: `TIER=s|m|l`,
+   default `m`; subtree tiers are clamped to the parent's via `MAXTIER`).
    In demo mode (the create-mvp pi extension) built-in tools are disabled — use the
    `create_mvp_demo` tool instead; demos there are pre-scaffolded.
 4. **Monitor**: `make -C <dir> progress` (artifact census with bar),

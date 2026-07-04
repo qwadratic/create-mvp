@@ -8,6 +8,23 @@ incl. id-gate negatives, `apieval-selftest` incl. TOON round-trip,
 `selfcheck-classify` tier ordering).
 Link audit across README + docs: 0 dead links.
 
+## Published
+
+**Live: <https://github.com/qwadratic/agentmake>** (PUBLIC, MIT). Pushed
+`main` → `origin/main` 2026-07-04; description (191 chars) + 12 topics per
+[`publish-meta.md`](publish-meta.md) verbatim. Verified post-publish: URL
+200, README renders via API (17988 bytes), media raw-fetch spot-check 3/3
+(engine-run.gif, gallery.png, LICENSE). Name `agentmake` taken as-is, no
+collision. Security: session sweep trusted (gitleaks full history 0 leaks)
++ spot-check 3 post-sweep commits 0 leaks + independent cold-clone re-scan
+(43 commits, 3.7 MB) 0 leaks; base64 blobs = signed thinking attestations,
+benign. Cold-clone re-judge: README followed literally with zero keys —
+`make demo-mock` 1.6 s wall wfcheck 17/17, `bin/cook` mock PASS 17/17,
+`--dry` 0 agents fired, selfchecks 7/7 + classify + wfcheck-selftest 28/28
+all green. Naming verdict: WINNER=cook POSTURE=HYBRID — published as
+`agentmake`, `bin/cook` is the one-shot CLI; rename/launch copy owned by
+naming workflow.
+
 ## What exists
 
 | area | artifact | status |

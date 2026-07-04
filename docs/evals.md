@@ -1,11 +1,10 @@
 # Evals: how agent output gets verified
 
-Agents lie confidently, so nothing in a create-mvp pipeline counts as done
-until a mechanical check says so. All eval tools live in [`evals/`](../evals/)
-and share one design: exit code is the verdict, so any of them can sit on a
-recipe line and gate a target (a failing check fails the recipe, and
-`.DELETE_ON_ERROR` discards the artifact — see
-[engine-internals.md](engine-internals.md)).
+Agents lie confidently, so nothing counts as done until a mechanical check
+says so. All eval tools live in [`evals/`](../evals/) and share one design:
+exit code is the verdict, so any of them can sit on a recipe line and gate a
+target (a failing check fails the recipe; `.DELETE_ON_ERROR` discards the
+artifact — see [engine-internals.md](engine-internals.md)).
 
 ## The toolbox
 
@@ -25,11 +24,11 @@ runs **many builds** to grade the engine itself.
 ## snap + evalshot: visual gates
 
 `snap` renders natively at the target low resolution (480×640 by default) —
-faster and smaller than rendering big and downscaling (measurements in
-[`evals/docs/BENCH.md`](../evals/docs/BENCH.md)). `evalshot` compares against a
-committed golden PNG and, on failure, writes `<shot>.diff.png` where bright
-pixels mark the mismatch. It refuses dimension mismatches loudly rather than
-rescaling, so viewport drift can't hide.
+faster and smaller than render-big-then-downscale (measurements in
+[`evals/docs/BENCH.md`](../evals/docs/BENCH.md)). `evalshot` compares against
+a committed golden PNG; on failure it writes `<shot>.diff.png`, bright pixels
+marking the mismatch. Dimension mismatches are refused loudly, never
+rescaled — viewport drift can't hide.
 
 Typical `check.sh` tail:
 
@@ -46,18 +45,17 @@ settling, masked timestamps) live in
 
 Raw JSON diffs break on key order and volatile fields. `apieval` normalizes
 first: a `.jq` query file reshapes the response (sort keys with `-S`, strip
-timestamps/ids, keep only what matters), then the result is encoded as
-[TOON](https://toonformat.dev) before diffing. TOON goldens declare
-keys once and stream rows, so they line-diff cleanly and stay cheap for agents
-to read back into context. `toon -d <golden>` recovers plain JSON when you
-want to inspect one.
+timestamps/ids, keep what matters), then encodes as
+[TOON](https://toonformat.dev) before diffing. TOON goldens declare keys once
+and stream rows — clean line-diffs, cheap for agents to read back into
+context. `toon -d <golden>` recovers plain JSON for inspection.
 
 ```bash
 evals/apieval http://localhost:8080/api/timeline evals/timeline.jq goldens/timeline.toon
 ```
 
-A live golden from the twitter-x demo — keys declared once, rows diff
-cleanly, volatile fields already stripped by the `.jq` reshape
+A live golden from the twitter-x demo — volatile fields already stripped by
+the `.jq` reshape
 ([`goldens/timeline.toon`](../demos/twitter-x/goldens/timeline.toon),
 re-checked on every `run.sh --check`):
 
@@ -73,30 +71,29 @@ seed_tweets[8]{handle,id,likes,name,replies,retweets,text,ts}:
 
 ## TUI goldens: text, not pixels
 
-A terminal is already a deterministic character grid — capture it as text and
+A terminal is already a deterministic character grid — capture as text and
 `diff -u` is the whole eval report. `tmux capture-pane -p` into a fixed 80×24
 session, poll for a readiness marker (never bare `sleep`), strip trailing
 whitespace, diff against a committed `.txt` golden. Full recipe, determinism
-gotchas, and the multi-frame interaction pattern (`send-keys` then re-capture)
-are in [`evals/docs/TUI.md`](../evals/docs/TUI.md).
+gotchas, and the multi-frame interaction pattern (`send-keys` then
+re-capture): [`evals/docs/TUI.md`](../evals/docs/TUI.md).
 
 ## Golden update protocol
 
 One rule: **a failing eval never auto-updates its golden.**
 
-- **First run** — no golden exists yet: `evalshot` and `apieval` seed it from
-  the current output, print a loud NOTE, and auto-pass. Review the seeded
-  golden by eye, then commit it. TUI goldens regenerate explicitly via
+- **First run** — no golden yet: `evalshot` and `apieval` seed from the
+  current output, print a loud NOTE, and auto-pass. Eyeball the seeded
+  golden, then commit it. TUI goldens regenerate explicitly via
   `UPDATE_GOLDEN=1`.
-- **Regression** (the normal failure): look at the diff (`.diff.png`, TOON
-  diff, or text diff), fix the code until the eval passes. Golden untouched.
+- **Regression** (the normal failure): read the diff (`.diff.png`, TOON diff,
+  or text diff), fix the code until the eval passes. Golden untouched.
 - **Intentional change**: eyeball the new output — that *is* the review —
   then delete the golden and rerun to re-seed (or `UPDATE_GOLDEN=1` for TUI).
   Commit the new golden **in the same commit** as the change that caused it,
-  with a message saying why. A golden changing in an unrelated commit is a
-  review red flag; `git log --stat -- '*golden*'` is the audit trail.
+  message saying why. A golden changing in an unrelated commit is a review
+  red flag; `git log --stat -- '*golden*'` is the audit trail.
 
-In the agent loop, builder agents receive eval failures as fix-loop feedback
-but are never given "delete the golden" as an action — otherwise every
-regression becomes an "intentional change". Only the reviewer gate or a human
-retires a golden.
+Builder agents receive eval failures as fix-loop feedback but never "delete
+the golden" as an action — otherwise every regression becomes an "intentional
+change". Only the reviewer gate or a human retires a golden.

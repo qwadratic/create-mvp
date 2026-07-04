@@ -1,13 +1,13 @@
 # Dogfood autopsy — why the board is the default now
 
-STEERING arc step 2: we tried to develop agentmake *with* agentmake — one
-ad-hoc `goal.md` per engine improvement, engine pipeline pointed at its own
-repo. This is the unedited evidence. Nothing below was cleaned up before the
-snapshot; the directories are committed as they landed.
+STEERING arc step 2: develop agentmake *with* agentmake — one ad-hoc
+`goal.md` per engine improvement, engine pipeline pointed at its own repo.
+This is the unedited evidence. Nothing was cleaned up before the snapshot;
+the directories are committed as they landed.
 
 ## What was attempted
 
-Two real engine improvements off the roadmap, each as the engine's own
+Two real engine improvements off the roadmap, each run as the engine's own
 documented workflow — a folder with two files:
 
 ```sh
@@ -18,7 +18,7 @@ cd dogfood-board-next && make -j2 all      # same for dogfood-progress-json
 ```
 
 Both runs *succeeded* by the engine's own gates: every `check.sh` green,
-both reviews end `VERDICT: PASS`. That is precisely the problem.
+both reviews end `VERDICT: PASS`. That is the problem.
 
 ## The mess (tree snapshot, verbatim)
 
@@ -83,19 +83,19 @@ two orphan `effort.json`, a stray `report.md` at the wrong level, a
 
 1. **The engine invented a parallel universe instead of using the repo's.**
    The goal said "our backlog board". This repo *has* a board —
-   `backlog/tasks/` with a CLI. The build agents never found it: they invented
-   their own markdown board format (`src/board-reader/fixtures/board.md`,
-   `# Backlog Board / ## todo`), a position-based task ID scheme, and an
-   `Acceptance:` marker convention. Four components, all gates green, review
-   PASS — for a board that exists nowhere but its own fixtures. The review
-   itself flagged it and passed anyway: *"board task IDs are position-based
-   (unstable across edits)"*.
+   `backlog/tasks/` with a CLI. The build agents never found it: they
+   invented their own markdown board format
+   (`src/board-reader/fixtures/board.md`, `# Backlog Board / ## todo`), a
+   position-based task ID scheme, an `Acceptance:` marker convention. Four
+   components, all gates green, review PASS — for a board that exists
+   nowhere but its own fixtures. The review itself flagged it and passed
+   anyway: *"board task IDs are position-based (unstable across edits)"*.
 
 2. **Green gates ≠ integrated.** Every `check.sh` passes; nothing landed in
-   `engine/`. Both deliverables are siloed under `dogfood-*/src/` where no
+   `engine/`. Both deliverables sit siloed under `dogfood-*/src/` where no
    `include` reaches them. The gates measure internal consistency of the run
-   dir — they cannot measure "did this improve the tool", because an ad-hoc
-   goal file carries no link back to the tool's actual state or work queue.
+   dir — not "did this improve the tool"; an ad-hoc goal file carries no link
+   back to the tool's actual state or work queue.
 
 3. **Artifacts leak and duplicate.** The progress-json reviewer wrote its
    report twice — `build/report.md` (the gated one) and a stray
@@ -103,11 +103,11 @@ two orphan `effort.json`, a stray `report.md` at the wrong level, a
    dir* and ran `make progress` against whatever it found. Ad-hoc dirs inside
    the tool's own repo have no boundary contract.
 
-4. **No queue semantics.** Which improvement is next? What's in flight? What's
-   done? The answer lived in two places that don't talk: the actual board in
+4. **No queue semantics.** Which improvement is next? What's in flight? Done?
+   The answer lived in two places that don't talk: the real board in
    `backlog/` (untouched by all of this) and a pile of directories whose only
    status signal is `ls */build/*.done`. Priority, ordering, done-tracking —
-   all already solved by the board the dogfood runs ignored.
+   all solved by the board the dogfood runs ignored.
 
 ## Why a board
 
@@ -121,8 +121,8 @@ All four are queue problems, and the repo already ships a queue:
 Backlog.md + CLI. Hence STEERING step 3 — `engine/board.mk` makes the board
 the engine's default goal source: `make board-next` pulls the top To Do task
 via the backlog CLI, materializes it as `goal.md` in a *managed* run dir
-(`board/<TASK-ID>/`), runs the pipeline, and marks the task Done via the CLI
-when the gates pass. Task = goal unit; status lives on the board; run
-artifacts live in one predictable place.
+(`board/<TASK-ID>/`), runs the pipeline, marks the task Done via the CLI when
+the gates pass. Task = goal unit; status lives on the board; run artifacts
+land in one predictable place.
 
 The dogfood dirs stay committed as-is. The mess is the argument.

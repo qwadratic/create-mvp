@@ -23,10 +23,10 @@ B won 4/6 but lost the criterion the mission exists for. Mission: "one plan
 call cannot foresee a big build; long runs re-plan as reality shifts." B
 replaces one blind upfront plan with N blind upfront plans — same failure
 mode, more calls. B's own rejected variant B2 (make re-include restart chain)
-demonstrates that lazy planning is structurally impossible inside a single
-make instance: make remakes all included makefiles before building anything.
-A plans each subtree at build time, after its dependencies exist — the only
-design where reality can inform the plan. A's losses are quality-of-life
+proves lazy planning structurally impossible inside a single make instance:
+make remakes all included makefiles before building anything. A plans each
+subtree at build time, after its dependencies exist — the only design where
+reality can inform the plan. A's losses are quality-of-life
 (log soup, census recursion, larger diff); B's loss is the mission.
 
 **Grafts from B (both cheap, both close A's worst cons):**
@@ -77,8 +77,8 @@ proves the `$(MAKE) -C dir all` pattern.
   depth cap forces leaf, and the integration contract siblings read from
   `plan.json`.
 - Rejected alternative: `needs_decomposition: true` without `sub_goal` (child
-  re-derives goal from desc). Rejected — desc is one sentence; the planner has
-  the context NOW; make it write the sub-goal while it's cheap.
+  re-derives goal from desc) — desc is one sentence; the planner has the
+  context NOW; make it write the sub-goal while it's cheap.
 
 Plan gate in `build.mk` grows three clauses (composite⇒sub_goal; fanout
 ceiling — graft 2; id/dep charset allowlist — ids are spliced verbatim into
@@ -331,10 +331,10 @@ Pure timestamp logic, no new state:
 - Completed subtree, parent re-invoked: `+$(MAKE) -C` runs, child reports
   "Nothing to be done", check.sh greps PASS, sentinel touched. Idempotent.
 
-This is also where lazy planning pays: a subtree interrupted BEFORE its plan
-exists costs nothing on resume — no stale sub-plan to reconcile, the plan is
-simply made when the trajectory next reaches it, with whatever reality then
-holds (deps built, parent plan possibly revised).
+This is where lazy planning pays: a subtree interrupted BEFORE its plan
+exists costs nothing on resume — no stale sub-plan to reconcile; the plan is
+made when the trajectory next reaches it, with whatever reality then holds
+(deps built, parent plan possibly revised).
 
 ## 8. Failure bubbling
 

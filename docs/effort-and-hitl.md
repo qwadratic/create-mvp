@@ -1,14 +1,14 @@
 # Effort classification and the human-in-the-loop switch
 
-Two control planes sit on top of the pipeline: an **effort classifier** that
-scales agent spend to how much the human invested in the goal, and a single
-**HITL switch** that flips any step between auto-approval and human approval.
+Two control planes sit on top of the pipeline: an **effort classifier**
+scaling agent spend to how much the human invested in the goal, and a single
+**HITL switch** flipping any step between auto and human approval.
 
 ## Effort tiers: agent effort ∝ user effort
 
-Phase 0 of every run is one cheap agent call: classify `goal.md` and write
+Phase 0 of every run is one cheap agent call: classify `goal.md`, write
 `build/effort.json`. The result is schema-gated with `jq -e` before anything
-else runs (a malformed classification kills the pipeline, not just warns).
+else runs — a malformed classification kills the pipeline, not just warns.
 
 | tier | goal looks like | fanout | review_depth | model_hint | thinking |
 |---|---|---|---|---|---|
@@ -30,30 +30,30 @@ Where each knob lands:
   verifies every acceptance criterion and makes evals mandatory (missing or
   failing evals = FAIL).
 
-The exact rubric the classifier follows is
-[`engine/prompts/classify.md`](../engine/prompts/classify.md); the knob
-plumbing is in [`engine/agent`](../engine/agent). `effort.json` also accepts
-hand-authored per-unit overrides (`units: {"plan": "high", "<component-id>":
-"low"}` plus a `tiers` map to models/thinking) when you want to route one hard
-component to a bigger model without upgrading the whole run.
+The classifier's exact rubric:
+[`engine/prompts/classify.md`](../engine/prompts/classify.md); knob plumbing:
+[`engine/agent`](../engine/agent). `effort.json` also accepts hand-authored
+per-unit overrides (`units: {"plan": "high", "<component-id>": "low"}` plus a
+`tiers` map to models/thinking) to route one hard component to a bigger model
+without upgrading the whole run.
 
 ## The HITL switch: approval is a file
 
-Design goal: one mechanism that flips any step — or the whole project —
-between autopilot and human approval, without leaving make. The full design
-discussion (alternatives considered and rejected: interactive `read`, `ifeq`
-per recipe, `.WAIT`, external CI approvals) is in
-[`evals/docs/DRIFT-DESIGN.md`](../evals/docs/DRIFT-DESIGN.md) §2; this is the
+Design goal: one mechanism flipping any step — or the whole project —
+between autopilot and human approval, without leaving make. Full design
+discussion (alternatives rejected: interactive `read`, `ifeq` per recipe,
+`.WAIT`, external CI approvals):
+[`evals/docs/DRIFT-DESIGN.md`](../evals/docs/DRIFT-DESIGN.md) §2. This is the
 mechanics summary.
 
 **State model.** Step `X` already produces `build/X.done` (built and
-self-checked). Add `build/approvals/X.ok` which *depends on* `X.done`, and
-point downstream consumers at the `.ok` instead of the `.done`. Everything
-else falls out of make's timestamp rules:
+self-checked). Add `build/approvals/X.ok` *depending on* `X.done`; point
+downstream consumers at the `.ok` instead of the `.done`. Everything else
+falls out of make's timestamp rules:
 
 - approval exists ⇔ the `.ok` file exists — survives restarts, no daemon;
-- rebuilding `X` makes `X.done` newer than `X.ok`, so the gate **re-opens
-  automatically** — you can never keep an approval for content that changed;
+- rebuilding `X` makes `X.done` newer than `X.ok`: the gate **re-opens
+  automatically** — no approval survives content that changed;
 - the `.ok` content records who approved, when, and the sha256 of what they
   approved — audit trail included.
 
@@ -100,19 +100,19 @@ pending:
 
 - *Auto* is a gate, not a rubber stamp: an approver agent inspects the
   artifact and must print a line starting `APPROVE`. Anything else fails the
-  recipe, `.DELETE_ON_ERROR` removes the half-written `.ok`, and the build
-  stops. The agent's reasoning is kept in `<step>.review` for audit.
-- *Human* fails the target with printed instructions. Run with `make -k` so
-  one blocked gate doesn't stall parallel siblings — every reachable step
-  still builds, every human gate prints its instruction, and `make pending`
-  lists the queue. Approve with `make approve-<step>`; rerunning `make`
-  resumes exactly where you left off. Revoke one gate with
-  `make unapprove-<step>`, or all of them with `rm -rf build/approvals`.
+  recipe, `.DELETE_ON_ERROR` removes the half-written `.ok`, the build stops.
+  The agent's reasoning stays in `<step>.review` for audit.
+- *Human* fails the target with printed instructions. Run `make -k` so one
+  blocked gate doesn't stall parallel siblings — every reachable step still
+  builds, every human gate prints its instruction, `make pending` lists the
+  queue. Approve: `make approve-<step>`; rerunning `make` resumes where you
+  left off. Revoke one gate: `make unapprove-<step>`; all of them:
+  `rm -rf build/approvals`.
 
 **Wiring into the engine.** The current `engine/build.mk` ships *without* the
-approvals block — dependency edges go straight `.done → .done` (this is
-tracked as a backlog task). Enabling it is a one-line change to the jq
-`components.mk` generator (dep edges reference `$(B)/approvals/<dep>.ok`
-instead of `$(B)/<dep>.done`) plus dropping in the rules above. The same
-pattern then covers component gates, eval verdicts, and the final review with
-no additional mechanism.
+approvals block — dependency edges go straight `.done → .done` (tracked as a
+backlog task). Enabling it: a one-line change to the jq `components.mk`
+generator (dep edges reference `$(B)/approvals/<dep>.ok` instead of
+`$(B)/<dep>.done`) plus the rules above. The same pattern then covers
+component gates, eval verdicts, and the final review with no additional
+mechanism.

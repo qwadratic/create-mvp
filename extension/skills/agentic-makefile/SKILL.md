@@ -26,8 +26,8 @@ exactly where it stopped.
      That include path assumes the dir lives at `demos/<name>/` inside the create-mvp
      repo. Outside the repo: copy or symlink `engine/` next to the project and use
      `include engine/build.mk`.
-     Shortcut: `bin/create-mvp "goal text"` (the repo's one-shot CLI) does steps 2–3 for
-     you — scaffolds goal.md + Makefile and runs the pipeline.
+     Shortcut: `bin/create-mvp "goal text"` (the repo's one-shot CLI) does steps 2–3 —
+     scaffolds goal.md + Makefile, runs the pipeline.
 3. **Run**: `make -C <dir> -j4 all`.
    In demo mode (the create-mvp pi extension) built-in tools are disabled — use the
    `create_mvp_demo` tool instead; demos there are pre-scaffolded.
@@ -37,7 +37,7 @@ exactly where it stopped.
    per-component `check.sh`, and reviewer `VERDICT: PASS`. Report that verdict —
    do not re-review by hand.
 6. **On failure**: rerun `make` first (it resumes). Persistent failure → inspect
-   `build/` artifacts, sharpen `goal.md`, rerun. `make clean` is last resort
+   `build/` artifacts, sharpen `goal.md`, rerun. Last resort: `make clean`
    (wipes `build/` and `src/`).
 
 ## Effort classifier

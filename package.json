@@ -1,0 +1,19 @@
+{
+  "name": "@qwadratic/create-mvp",
+  "version": "0.1.0",
+  "description": "Sentence in, software out — agents write the Makefile DAG, make runs the agents. Runs on the coding agent CLI you already have (claude -p, pi -p, codex, gemini).",
+  "bin": { "create-mvp": "bin/create-mvp" },
+  "files": [
+    "bin/",
+    "engine/",
+    "evals/wfcheck",
+    "evals/snap",
+    "evals/evalshot",
+    "evals/apieval"
+  ],
+  "os": ["darwin", "linux"],
+  "repository": { "type": "git", "url": "git+https://github.com/qwadratic/create-mvp.git" },
+  "keywords": ["agents", "make", "makefile", "scaffold", "codegen", "claude", "mvp", "create"],
+  "author": "qwadratic",
+  "license": "MIT"
+}

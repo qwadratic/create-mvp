@@ -20,3 +20,4 @@ demos/mock/src/
 
 # pi session logs — runtime data, keep local only
 evals/matrix-runs/**/.sessions/
+*.tgz

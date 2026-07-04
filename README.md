@@ -20,15 +20,31 @@ pauses are compressed; nothing else is. Cast file:
 
 ## 60-second quickstart
 
+No API key, no LLM, no config — just `make` and `jq`:
+
 ```sh
 git clone <this repo> && cd agentmake
-make demo        # needs the pi (or claude) CLI on PATH with an API key
+make demo-mock   # full pipeline on a deterministic mock agent, ~1s
 ```
 
-`make demo` wipes and rebuilds [`demos/game-of-life`](demos/game-of-life/)
-from its 33-byte goal — real agents, real gates, ends with the artifact census
-and the dependency graph. Pick a bigger one with `make demo DEMO=twitter-x`.
-No API key? The gif above *is* that run.
+That runs the *entire real engine* — classify → plan → parallel builds →
+review gate, including one composite component recursing into its own nested
+subtree — with [a 60-line bash stub](engine/fixtures/mock-agent) standing in
+for the LLM. It ends with the progress census, the mermaid dependency graph
+(nested subgraph included), and a `wfcheck` grade of the finished run
+(17/17). What you *don't* see is agents thinking; everything else — the DAG,
+the gates, the resume semantics — is exactly what the real runs below use.
+
+Got the `pi` (or `claude`) CLI on PATH with an API key? Same engine, real
+agents:
+
+```sh
+make demo        # wipes + rebuilds demos/game-of-life from its 33-byte goal
+```
+
+Real agents, real gates, ends with the artifact census and the dependency
+graph. Pick a bigger one with `make demo DEMO=twitter-x`. The gif above *is*
+that run.
 
 Your own project is a folder with two files:
 

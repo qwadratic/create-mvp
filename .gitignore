@@ -14,3 +14,6 @@ __pycache__/
 *.pyc
 # demoscene render products (mp4/gif/pgm build outputs, regenerate via mk-*.py)
 demoscene/out/
+# mock demo run products (regenerate: make demo-mock)
+demos/mock/build/
+demos/mock/src/

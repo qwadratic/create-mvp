@@ -6,7 +6,7 @@ You type a sentence; a planning agent decomposes it, `jq` turns the plan into
 makefile rules, and GNU make schedules one gated build agent per component —
 parallel with `-j`, resumable by default, recursive for components too big for
 one agent. No orchestrator daemon, no framework: the engine is
-[~120 lines of Makefile](engine/build.mk).
+[~130 lines of Makefile](engine/build.mk).
 
 ![the engine, live](media/engine-run.gif)
 
@@ -183,7 +183,7 @@ verbatim excerpts in [docs/engine-internals.md](docs/engine-internals.md).
 
 ## Runtime
 
-The agent adapter ([`engine/agent`](engine/agent)) is ~220 lines of bash; the
+The agent adapter ([`engine/agent`](engine/agent)) is ~200 lines of bash; the
 harness is pluggable:
 
 ```sh

@@ -73,8 +73,8 @@ $(B)/plan.json: $(GOAL) $(B)/effort.json
 # scaffold subtree + recurse. AT_CAP=1 forces the leaf branch regardless of the
 # planner (deterministic depth bound). Child vars go on the $(MAKE) command
 # line: kills the export env leak AND beats MAKEFLAGS-propagated assignments.
-# MAXTIER=$$(jq -r .tier …) resolves at recipe run time — parent's classified
-# tier becomes the child's ceiling. Uniform tail (check.sh + touch) keeps
+# MAXTIER=$$(jq -r .tier …) resolves at recipe run time — parent's tier
+# becomes the child's ceiling. Uniform tail (check.sh + touch) keeps
 # sentinel semantics identical for both kinds.
 -include $(B)/components.mk
 $(B)/components.mk: $(B)/plan.json

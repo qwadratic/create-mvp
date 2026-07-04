@@ -20,7 +20,7 @@ grep -q "created -> ./$d" run.txt                         || fail "no artifact c
 [ "$(cat "$d/goal.md")" = "game of life, make it look alive" ] || fail "goal.md not verbatim"
 echo "PASS 1 full pipeline + wfcheck"
 
-# 2 ── --dry: classify+plan only, posture printed, nothing built
+# 2 ── --dry: plan only, posture printed, nothing built
 "$CLI" --dry --runtime mock --dir dry-run "a pomodoro timer, keyboard only" > dry.txt 2>&1 \
   || { cat dry.txt >&2; fail "--dry exited nonzero"; }
 [ -f dry-run/build/plan.json ]   || fail "dry: no plan.json"
@@ -54,10 +54,10 @@ now=$(stat -f %m dry-run/build/plan.json 2>/dev/null || stat -c %Y dry-run/build
 [ "$plan_mtime" = "$now" ] || fail "resume replanned (plan.json mtime changed)"
 echo "PASS 4 --resume"
 
-# 5 ── --tier: classifier bypassed, override survives the run
+# 5 ── --tier compat alias: explicit tier survives the run
 "$CLI" --dry --runtime mock --tier prd --dir tiered "tiny thing" >/dev/null 2>&1 \
   || fail "--tier run failed"
-[ "$(jq -r .tier tiered/build/effort.json)" = prd ] || fail "tier override lost (classifier reran)"
+[ "$(jq -r .tier tiered/build/effort.json)" = prd ] || fail "tier override lost"
 echo "PASS 5 --tier override"
 
 # 6 ── --board round-trip in a throwaway backlog project (repo board untouched)

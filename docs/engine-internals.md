@@ -1,6 +1,6 @@
 # Engine internals: the make features doing the work
 
-The whole engine is one file, [`engine/build.mk`](../engine/build.mk) (~120 lines).
+The whole engine is one file, [`engine/build.mk`](../engine/build.mk) (~130 lines).
 Everything below is stock GNU make — nothing patched or wrapped. Each section:
 what the feature does here, why it earns its place. Excerpts are verbatim from
 the engine unless labeled.

@@ -68,7 +68,8 @@ run_model() {  # run_model <provider/model>
   t0=$(date +%s)
   # ENGINE_CLI_FLAGS appended last in engine/agent -> pins model over effort knobs;
   # PI_SESSION_DIR keeps session jsonl for token/cost accounting.
-  ENGINE_CLI_FLAGS="--model $m" PI_SESSION_DIR=$run/.sessions \
+  # ENGINE_CLI=pi pinned: matrix parses pi session jsonl (engine default is claude).
+  ENGINE_CLI=pi ENGINE_CLI_FLAGS="--model $m" PI_SESSION_DIR=$run/.sessions \
     timeout "$RUN_TIMEOUT" make -C "$run" -j"$JOBS" all > "$run/make.log" 2>&1 || rc=$?
   t1=$(date +%s)
   echo "$rc" > "$run/make.rc"

@@ -40,6 +40,10 @@ flags:
   --runtime R     cli (default) | sdk | mock   (mock = zero LLM calls)
   --board         don't build: file the goal as a Backlog.md task instead
   --jobs N        make -jN fan-out (default 2)
+
+env:
+  ENGINE_CLI      claude (default) | pi | codex | gemini | opencode | custom
+                  (custom: set ENGINE_CLI_CUSTOM='mycli --flag {prompt}')
 EOF
 }
 

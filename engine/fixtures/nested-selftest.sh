@@ -137,10 +137,11 @@ STUB=$TMP/stub; mkdir -p "$STUB" "$TMP/clamp"
 printf '#!/bin/bash\necho '\''{"tier":"prd","fanout":"5-8","review_depth":"full","model_hint":"large","thinking":"high"}'\''\n' > "$STUB/pi"
 chmod +x "$STUB/pi"
 echo 'goal' > "$TMP/clamp/goal.md"
-out=$(cd "$TMP/clamp" && PATH="$STUB:$PATH" MAXTIER=vague "$ENGINE/agent" classify goal.md)
+# ENGINE_CLI=pi pinned: the stub classifier on PATH is named `pi` (engine default is claude)
+out=$(cd "$TMP/clamp" && PATH="$STUB:$PATH" ENGINE_CLI=pi MAXTIER=vague "$ENGINE/agent" classify goal.md)
 echo "$out" | jq -e '.tier=="vague" and .fanout=="2-3" and .review_depth=="smoke" and .model_hint=="small" and .thinking=="low"' > /dev/null \
   || fail "MAXTIER=vague clamp: expected whole vague row, got: $out"
-out=$(cd "$TMP/clamp" && PATH="$STUB:$PATH" MAXTIER=prd "$ENGINE/agent" classify goal.md)
+out=$(cd "$TMP/clamp" && PATH="$STUB:$PATH" ENGINE_CLI=pi MAXTIER=prd "$ENGINE/agent" classify goal.md)
 echo "$out" | jq -e '.tier=="prd" and .thinking=="high"' > /dev/null \
   || fail "MAXTIER=prd clamp altered an in-bounds row: $out"
 

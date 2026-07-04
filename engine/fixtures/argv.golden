@@ -1,0 +1,36 @@
+== claude tools=no
+argv: claude -p --append-system-prompt \<system.md\> --tools ''
+stdin: PROMPT
+== claude tools=yes
+argv: claude -p --append-system-prompt \<system.md\>
+stdin: PROMPT
+== pi tools=no
+argv: pi -p --no-context-files --no-skills --no-prompt-templates --no-extensions --append-system-prompt \<engine\>/prompts/system.md --no-session --no-tools
+argv+: PROMPT
+== pi tools=yes
+argv: pi -p --no-context-files --no-skills --no-prompt-templates --no-extensions --append-system-prompt \<engine\>/prompts/system.md --no-session
+argv+: PROMPT
+== codex tools=no
+argv: codex exec --skip-git-repo-check -o \<tmp\>
+stdin: $'<system.md>\n\n---\n\nPROMPT'
+== codex tools=yes
+argv: codex exec --skip-git-repo-check -o \<tmp\> -s workspace-write
+stdin: $'<system.md>\n\n---\n\nPROMPT'
+== gemini tools=no
+argv: gemini
+stdin: $'<system.md>\n\n---\n\nPROMPT'
+== gemini tools=yes
+argv: gemini --yolo
+stdin: $'<system.md>\n\n---\n\nPROMPT'
+== opencode tools=no
+argv: opencode run
+argv+: $'<system.md>\n\n---\n\nPROMPT'
+== opencode tools=yes
+argv: opencode run
+argv+: $'<system.md>\n\n---\n\nPROMPT'
+== custom {prompt} slot
+argv: mycli --oneshot $'<system.md>\n\n---\n\nPROMPT'
+stdin: (none — {prompt} in template)
+== custom stdin (no slot)
+argv: mycli --oneshot
+stdin: $'<system.md>\n\n---\n\nPROMPT'

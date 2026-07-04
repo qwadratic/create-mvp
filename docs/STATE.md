@@ -1,7 +1,8 @@
 # STATE — repo snapshot for the iterate-until-viral loop
 
-Last updated: 2026-07-04 @ demoscene synthesis (judge rounds closed,
-follow-ups TASK-21/22; earlier nested round: TASK-17/18/19).
+Last updated: 2026-07-04 @ create-mvp rename converged (repo + CLI,
+cold-verified 9/10; earlier: demoscene synthesis, judge rounds closed,
+follow-ups TASK-21/22; nested round: TASK-17/18/19).
 Working tree clean, all selftests re-run green at write time
 (`wfcheck-selftest` 28/28 incl. nested breaks, `nested-selftest` full matrix
 incl. id-gate negatives, `apieval-selftest` incl. TOON round-trip,
@@ -27,7 +28,15 @@ all green. Naming: USER OVERRIDE final — WINNER=create-mvp
 POSTURE=RENAME-NOW ([naming.md](naming.md)); repo renamed
 `qwadratic/agentmake` → `qwadratic/create-mvp`, CLI `bin/cook` →
 `bin/create-mvp`. Earlier cook/HYBRID verdict superseded (kept as history
-in naming.md).
+in naming.md). Rename cold-verified from anonymous clone: 301 redirect
+live, `make demo-mock` 1.9 s wall wfcheck 17/17, selfchecks 7/7, README
+links 41/41; full-history gitleaks post-rename (51 commits, 3.72 MB)
+0 leaks, zero `.env`/psst blobs, zero embedded base64 payloads.
+**Naming wf still in flight** (pink-extension demo + launch copy): its
+launch copy must say `create-mvp` — override wired via
+[naming.md](naming.md), which its judges re-read; remaining `cook`
+mentions (19, all in naming.md history / rename narrative / backlog
+record) are intentional and marked stale.
 
 ## What exists
 

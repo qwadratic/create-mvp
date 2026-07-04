@@ -162,14 +162,26 @@ case $role in
     ;;
   classify)
     export GOAL_TEXT="$(cat "$1")"
+    # capture first: agent errors (e.g. claude prints its 401 on STDOUT) must
+    # surface, not vanish into jq's stdin as a cryptic parse error.
+    # ponytail: classify-only — auth failures always hit classify first.
+    if ! out=$(run classify no "$(render classify.md)"); then
+      { echo "agent: classify call failed (ENGINE_CLI=$ENGINE_CLI, RUNTIME=$RUNTIME). Agent output:"
+        printf '%s\n' "$out" | head -5; } >&2
+      exit 1
+    fi
     # MAXTIER clamp (rfc-nested §5b): deterministic post-process — LLM output is
     # a trust boundary; a subtree can never exceed its parent's tier. Clamps the
     # WHOLE knob row (a clamped tier with prd fanout/model defeats the point).
-    run classify no "$(render classify.md)" | sed '/^```/d' | jq -c --arg max "${MAXTIER:-prd}" '
+    printf '%s\n' "$out" | sed '/^```/d' | jq -c --arg max "${MAXTIER:-prd}" '
       def r: {"vague":0,"standard":1,"prd":2};
       def row: {"vague":   {tier:"vague",   fanout:"2-3",review_depth:"smoke",   model_hint:"small",  thinking:"low"},
                 "standard":{tier:"standard",fanout:"3-5",review_depth:"standard",model_hint:"default",thinking:"medium"}};
-      if r[.tier] > r[$max] then row[$max] else . end'
+      if r[.tier] > r[$max] then row[$max] else . end' || {
+      { echo "agent: classify output is not JSON (auth failure? probe: $ENGINE_CLI with a trivial prompt). Agent output:"
+        printf '%s\n' "$out" | head -5; } >&2
+      exit 1
+    }
     ;;
   plan)
     export GOAL_TEXT="$(cat "$1")" FANOUT="$(knob fanout "3-5")"

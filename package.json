@@ -1,8 +1,10 @@
 {
   "name": "@qwadratic/create-mvp",
-  "version": "0.1.0",
-  "description": "Sentence in, software out — agents write the Makefile DAG, make runs the agents. Runs on the coding agent CLI you already have (claude -p, pi -p, codex, gemini).",
-  "bin": { "create-mvp": "bin/create-mvp" },
+  "version": "0.1.1",
+  "description": "Sentence in, software out \u2014 agents write the Makefile DAG, make runs the agents. Runs on the coding agent CLI you already have (claude -p, pi -p, codex, gemini).",
+  "bin": {
+    "create-mvp": "bin/create-mvp"
+  },
   "files": [
     "bin/",
     "engine/",
@@ -11,9 +13,27 @@
     "evals/evalshot",
     "evals/apieval"
   ],
-  "os": ["darwin", "linux"],
-  "repository": { "type": "git", "url": "git+https://github.com/qwadratic/create-mvp.git" },
-  "keywords": ["agents", "make", "makefile", "scaffold", "codegen", "claude", "mvp", "create"],
+  "os": [
+    "darwin",
+    "linux"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/qwadratic/create-mvp.git"
+  },
+  "keywords": [
+    "agents",
+    "make",
+    "makefile",
+    "scaffold",
+    "codegen",
+    "claude",
+    "mvp",
+    "create"
+  ],
   "author": "qwadratic",
-  "license": "MIT"
+  "license": "MIT",
+  "scripts": {
+    "prepublishOnly": "git diff --quiet HEAD -- bin engine evals || { echo \"REFUSED: dirty working tree in packaged paths \u2014 commit first (0.1.0 shipped a mid-edit snapshot this way)\"; exit 1; }"
+  }
 }

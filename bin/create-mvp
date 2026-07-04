@@ -147,6 +147,16 @@ case $RT in
   mock)    MK+=(AGENT="$ROOT/engine/fixtures/mock-agent") ;;
   cli|sdk) export RUNTIME=$RT ;;
 esac
+
+# ── auth preflight: fail fast + actionable BEFORE burning pipeline steps
+# (trust boundary: agent CLI errors must never masquerade as pipeline JSON)
+if [ "$RT" = cli ]; then
+  cli_bin=${ENGINE_CLI:-claude}
+  command -v "${cli_bin%% *}" >/dev/null || die "runtime CLI '$cli_bin' not found — install it or pick another: ENGINE_CLI=pi|claude|codex|gemini|opencode, or --runtime mock"
+  if ! "$ROOT/engine/agent" preflight >/dev/null 2>&1; then
+    die "runtime CLI '$cli_bin' failed auth/echo preflight — authenticate it (e.g. run '$cli_bin' once interactively) or switch: ENGINE_CLI=pi $0 ... | --runtime mock. Detail: $("$ROOT/engine/agent" preflight 2>&1 | head -2)"
+  fi
+fi
 LOG=$DIR/build/create-mvp.log
 
 # ── --dry: classify + plan, then show what a full run would spend

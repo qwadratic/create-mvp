@@ -160,6 +160,10 @@ case $role in
   argv)  # dry: render invocation for current ENGINE_CLI, no agent call (selfcheck-argv.sh)
     ENGINE_DRY=1 run argv "${1:-no}" "${2:-PROMPT}"
     ;;
+  preflight)  # cheap auth/echo probe: one tool-less call, exact-token contract
+    out=$(run preflight no 'Reply with exactly the single word: PONG' 2>&1) || { echo "$out"; exit 1; }
+    case $out in *PONG*) exit 0 ;; *) echo "unexpected agent reply: ${out:0:200}"; exit 1 ;; esac
+    ;;
   classify)
     export GOAL_TEXT="$(cat "$1")"
     # capture first: agent errors (e.g. claude prints its 401 on STDOUT) must

@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Pinkify",
+  "version": "1.0.0",
+  "description": "Makes all websites pink.",
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_start"
+    }
+  ]
+}

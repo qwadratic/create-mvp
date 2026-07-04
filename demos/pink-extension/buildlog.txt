@@ -1,0 +1,39 @@
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent classify goal.md > build/effort.json
+jq -e '(.tier|IN("vague","standard","prd")) and (.fanout|test("^[0-9]+-[0-9]+$")) and (.review_depth|IN("smoke","standard","full")) and (.model_hint|IN("small","default","large")) and (.thinking|IN("off","low","medium","high"))' build/effort.json > /dev/null   # gate: schema
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent plan goal.md > build/plan.json
+jq -e --argjson maxf 8 'def okid: type=="string" and test("^[a-z0-9][a-z0-9-]{0,63}$"); (.components | length > 0 and length <= $maxf) and all(.components[]; (.id|okid) and all(.deps[]?; okid) and ((.kind // "leaf") == "leaf" or (.sub_goal | type=="string" and length > 0)))' build/plan.json > /dev/null   # gate: bounded fanout; composite ⇒ sub_goal; id/dep charset — ids splice into make targets + shell recipe lines via the jq template (LLM output = trust boundary)
+jq -r --arg cap "0" '.components[] | "build/\(.id).done: build/plan.json \(.deps | map("build/\(.).done") | join(" "))\n" + (if (.kind // "leaf") == "composite" and $cap != "1" then "\t$(ENGINE)subtree \(.id)\n\t+$(MAKE) -C src/\(.id) GOAL=goal.md B=build SRC=src AGENTMAKE_DEPTH=1 MAXTIER=$$(jq -r .tier build/effort.json) all\n" else "\t$(AGENT) build \(.id)\n" end) + "\tbash src/\(.id)/check.sh\n\ttouch $@\nCOMPONENTS += build/\(.id).done\n"' build/plan.json > build/components.mk
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build pink-css-injector
+Done. Files:
+
+- `src/pink-css-injector/content.js` — `buildPinkCss()` pure function; injects `<style>` only when `document` exists; CommonJS export guarded for Node.
+- `src/pink-css-injector/test.js` — asserts selectors + `!important` rules.
+- `src/pink-css-injector/check.sh` — `node --check` + test, passes.
+
+ponytail: universal `*` selector nukes all backgrounds/text; upgrade path is targeted selectors + preserving images if fidelity matters.
+bash src/pink-css-injector/check.sh
+pink-css-injector: OK
+touch build/pink-css-injector.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build extension-manifest
+Done. Files under `src/extension-manifest/`:
+- `manifest.json` — MV3, `<all_urls>` content script, `content.js` at `document_start`
+- `test.js` — asserts manifest_version=3, matches, js, metadata
+- `check.sh` — runs test; passes.
+bash src/extension-manifest/check.sh
+extension-manifest OK
+touch build/extension-manifest.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent build packaging-check
+Done.
+
+- `src/packaging-check/check.js` — validates extension dir: parses manifest.json, checks referenced content_scripts js/css exist, `node --check` on JS.
+- `src/packaging-check/check.sh` — runs both sibling self-tests, stages manifest+content.js into temp dir, validates (expect 0), deletes content.js, expects nonzero. Exit 0, temp dir cleaned via trap.
+
+ponytail: only checks content_scripts refs; manifest has no icons/background — add fields to ref scan if manifest grows.
+bash src/packaging-check/check.sh
+pink-css-injector: OK
+extension-manifest OK
+OK: extension dir valid (1 referenced files)
+OK: packaging-check self-test passed
+touch build/packaging-check.done
+/Users/gerhardgustav/Desktop/hobby-dev/agentmake/engine/agent review > build/report.md
+grep -q 'VERDICT: PASS' build/report.md

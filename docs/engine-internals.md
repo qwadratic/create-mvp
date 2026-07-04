@@ -98,7 +98,7 @@ sure it's there, then never look at it again."
 
 ## `make -jN` — a free agent scheduler
 
-There is no scheduler code in agentmake. Parallel agent orchestration is
+There is no scheduler code in create-mvp. Parallel agent orchestration is
 `make -j4 all`: make walks the generated DAG, launches every component whose
 dependencies are satisfied as a concurrent agent process, and holds back the
 ones that must wait. Dependency ordering, fan-out, fan-in on the review gate,

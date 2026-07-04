@@ -1,4 +1,4 @@
-# agentmake engine — goal.md → effort → plan → components (parallel, dep-ordered) → review gate
+# create-mvp engine — goal.md → effort → plan → components (parallel, dep-ordered) → review gate
 #
 # Effort classifier (Phase 0): agent effort ∝ user effort in goal.md.
 #   tier     | fanout | review_depth | model_hint | thinking

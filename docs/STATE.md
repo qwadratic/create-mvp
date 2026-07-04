@@ -10,20 +10,24 @@ Link audit across README + docs: 0 dead links.
 
 ## Published
 
-**Live: <https://github.com/qwadratic/agentmake>** (PUBLIC, MIT). Pushed
+**Live: <https://github.com/qwadratic/create-mvp>** (PUBLIC, MIT; renamed
+from `agentmake` 2026-07-04, gh 301 redirect preserved). Pushed
 `main` → `origin/main` 2026-07-04; description (191 chars) + 12 topics per
 [`publish-meta.md`](publish-meta.md) verbatim. Verified post-publish: URL
 200, README renders via API (17988 bytes), media raw-fetch spot-check 3/3
-(engine-run.gif, gallery.png, LICENSE). Name `agentmake` taken as-is, no
-collision. Security: session sweep trusted (gitleaks full history 0 leaks)
+(engine-run.gif, gallery.png, LICENSE). Name `agentmake` taken as-is at
+publish (since renamed `create-mvp`), no collision. Security: session sweep trusted (gitleaks full history 0 leaks)
 + spot-check 3 post-sweep commits 0 leaks + independent cold-clone re-scan
 (43 commits, 3.7 MB) 0 leaks; base64 blobs = signed thinking attestations,
 benign. Cold-clone re-judge: README followed literally with zero keys —
-`make demo-mock` 1.6 s wall wfcheck 17/17, `bin/cook` mock PASS 17/17,
+`make demo-mock` 1.6 s wall wfcheck 17/17, `bin/cook` (since renamed
+`bin/create-mvp`, selfchecks re-run green post-rename) mock PASS 17/17,
 `--dry` 0 agents fired, selfchecks 7/7 + classify + wfcheck-selftest 28/28
-all green. Naming verdict: WINNER=cook POSTURE=HYBRID — published as
-`agentmake`, `bin/cook` is the one-shot CLI; rename/launch copy owned by
-naming workflow.
+all green. Naming: USER OVERRIDE final — WINNER=create-mvp
+POSTURE=RENAME-NOW ([naming.md](naming.md)); repo renamed
+`qwadratic/agentmake` → `qwadratic/create-mvp`, CLI `bin/cook` →
+`bin/create-mvp`. Earlier cook/HYBRID verdict superseded (kept as history
+in naming.md).
 
 ## What exists
 
@@ -38,7 +42,7 @@ naming workflow.
 | Evals | [`evals/`](../evals/): `snap` (~0.2s/shot), `evalshot` (SSIM golden), `apieval` (jq+TOON golden), `wfcheck` (whole-run grade), `matrix` (multi-model); TUI tmux-golden recipe | selftests green; apieval wired live in twitter-x `run.sh --check` |
 | Effort tiers | classify gate: vague/standard/prd → fan-out, review depth, model hint, thinking | [`docs/effort-and-hitl.md`](effort-and-hitl.md) |
 | HITL design | approval-file gates (`build/approvals/<step>.ok`, timestamp staleness re-opens) | designed + documented, NOT wired by default (TASK-2) |
-| pi extension | [`extension/index.ts`](../extension/index.ts): built-ins disabled, single `agentmake_demo` tool, `/demo` command, bundled `agentic-makefile` skill | judge-verified present |
+| pi extension | [`extension/index.ts`](../extension/index.ts): built-ins disabled, single `create_mvp_demo` tool, `/demo` command, bundled `agentic-makefile` skill | judge-verified present |
 | Dogfood narrative | [`docs/dogfood-autopsy.md`](dogfood-autopsy.md) + committed mess dirs (`dogfood-*/`) + README "Eating the dogfood" | STEERING arc complete |
 | Secret protection | psst + gitleaks `[[allowlists]]`, tracked `.githooks/pre-commit` | live-tested: staged AKIA/ghp tokens → commit blocked |
 | Media | `media/`: engine-run cast+gif, per-demo gifs, gallery.png | real, unedited runs |

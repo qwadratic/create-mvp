@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# wfcheck <project-dir> — workflow-correctness eval for an agentmake engine run.
+# wfcheck <project-dir> — workflow-correctness eval for a create-mvp engine run.
 # Measures: plan schema, DAG validity, per-component src + check.sh presence,
 # check.sh re-runs (exit 0), census (.done stamps), review VERDICT: PASS.
 # Emits <project>/build/wfscore.json {checks:[{name,pass,detail}],passed,total,score}
@@ -100,7 +100,7 @@ for id in $(jq -r '.components[]?.id // empty' "$plan" 2>/dev/null); do
   fi
 done
 
-# ── subtree recursion: composite component == nested agentmake project at $SRC/<id>/.
+# ── subtree recursion: composite component == nested create-mvp project at $SRC/<id>/.
 # One check per subtree at this level (no flat summing — a fanout-8 subtree would
 # dilute the parent score); drill-down lives in the child's own wfscore.json,
 # surfaced via .subtrees below. Parent PASS requires every subtree PASS, recursively.

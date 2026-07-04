@@ -1,4 +1,4 @@
-# agentmake
+# create-mvp
 
 **Agents write the DAG. `make` runs the agents.**
 
@@ -18,19 +18,19 @@ classify → plan → three build agents → review gate, then `make progress` a
 pauses are compressed; nothing else is. Cast file:
 [`media/engine-run.cast`](media/engine-run.cast).*
 
-## One command: `cook`
+## One command: `create-mvp`
 
-One repo, two names: `agentmake` is the engine you clone, `cook` is the command you type — the ripgrep/`rg` split.
+One name everywhere: `create-mvp` is the repo you clone and the command you type — the `create-react-app` scaffolder lineage.
 
 ```sh
-bin/cook "an extension that makes all websites pink"
+bin/create-mvp "an extension that makes all websites pink"
 ```
 
 No Makefile authoring, no goal file editing — say the thing, get software.
-`cook` slugs your sentence into a project dir under cwd, writes `goal.md`
+`create-mvp` slugs your sentence into a project dir under cwd, writes `goal.md`
 verbatim, drops the 3-line Makefile, and runs the full pipeline with a live
 progress bar; it exits with the artifact paths and the run's
-[wfcheck](evals/wfcheck) score. No API key? `bin/cook --runtime mock "..."`
+[wfcheck](evals/wfcheck) score. No API key? `bin/create-mvp --runtime mock "..."`
 is the same one-shot on the deterministic mock agent.
 
 ```
@@ -51,13 +51,13 @@ is the same one-shot on the deterministic mock agent.
 | `--board` | don't build now — file the goal as a Backlog.md task (`make board-task` later) |
 | `--resume <dir>` | continue a stopped or failed run exactly where it left off (plain `make` resume) |
 | `--dir`, `--jobs` | project dir override; `-j` fan-out (default 2) |
-| `cook progress <dir>`, `cook graph <dir>` | census bar / mermaid DAG passthroughs |
+| `create-mvp progress <dir>`, `create-mvp graph <dir>` | census bar / mermaid DAG passthroughs |
 
 The goal text is a trust boundary: it lands in `goal.md` verbatim and
 nowhere else — the directory name is derived through a `[a-z0-9-]` charset
 gate, and nothing from the sentence is ever interpolated into the Makefile
 or a shell line. Self-checks (mock runtime, includes an injection attempt):
-[`bin/selfcheck-cook.sh`](bin/selfcheck-cook.sh). `cook` is orchestration
+[`bin/selfcheck-create-mvp.sh`](bin/selfcheck-create-mvp.sh). `create-mvp` is orchestration
 only — everything below it is the same engine you can drive by hand.
 
 ## 60-second quickstart
@@ -65,9 +65,9 @@ only — everything below it is the same engine you can drive by hand.
 No API key, no LLM, no config — just `make` and `jq`:
 
 ```sh
-git clone https://github.com/qwadratic/agentmake && cd agentmake
+git clone https://github.com/qwadratic/create-mvp && cd create-mvp
 make demo-mock   # full pipeline on a deterministic mock agent, ~1s
-ln -s "$PWD/bin/cook" ~/.local/bin/cook   # optional: the `cook` binary on PATH
+ln -s "$PWD/bin/create-mvp" ~/.local/bin/create-mvp   # optional: the `create-mvp` binary on PATH
 ```
 
 That runs the *entire real engine* — classify → plan → parallel builds →
@@ -89,13 +89,13 @@ Real agents, real gates, ends with the artifact census and the dependency
 graph. Pick a bigger one with `make demo DEMO=twitter-x`. The gif above *is*
 that run.
 
-Your own project is a folder with two files — `cook` writes both for you,
+Your own project is a folder with two files — `create-mvp` writes both for you,
 or by hand:
 
 ```sh
 mkdir my-thing && cd my-thing
 echo "a pomodoro timer, keyboard only" > goal.md
-printf 'GOAL ?= goal.md\ninclude ../agentmake/engine/build.mk\n' > Makefile
+printf 'GOAL ?= goal.md\ninclude ../create-mvp/engine/build.mk\n' > Makefile
 make -j4
 ```
 
@@ -306,10 +306,10 @@ the fix and the follow-up hardening task are on the board.
 
 ```sh
 pi -e extension/index.ts                                  # try it once
-ln -s "$PWD/extension" ~/.pi/agent/extensions/agentmake   # install
+ln -s "$PWD/extension" ~/.pi/agent/extensions/create-mvp   # install
 ```
 
-Locks the session to a single `agentmake_demo` tool (built-ins disabled),
+Locks the session to a single `create_mvp_demo` tool (built-ins disabled),
 streams `make` progress live, adds a `/demo <dir>` command, and bundles the
 [`agentic-makefile` skill](extension/skills/agentic-makefile/SKILL.md) so plain
 pi sessions know how to scaffold and drive the pipeline.

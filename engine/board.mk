@@ -1,4 +1,4 @@
-# agentmake board — Backlog.md is the engine's DEFAULT work queue.
+# create-mvp board — Backlog.md is the engine's DEFAULT work queue.
 #
 # Why (docs/dogfood-autopsy.md): ad-hoc goal.md files don't scale — no queue,
 # no lifecycle, clutter dir per idea. The board IS the goal source:

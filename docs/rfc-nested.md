@@ -44,7 +44,7 @@ Explicitly rejected from B: flatten-at-generate itself (loses lazy planning);
 
 ## Shape in one paragraph
 
-Composite component = full agentmake project nested at `src/<id>/`. Parent's
+Composite component = full create-mvp project nested at `src/<id>/`. Parent's
 generated rule scaffolds `goal.md` + 3-line Makefile + delegating `check.sh`,
 then `+$(MAKE) -C src/<id> all`. Subtree runs the SAME pipeline (classify →
 plan → components → review) via the same `engine/build.mk`. Parent sentinel

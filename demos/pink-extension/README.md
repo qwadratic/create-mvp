@@ -3,7 +3,7 @@
 The sentence from the README's API vision, executed verbatim:
 
 ```sh
-cook "an extension that makes all websites pink" --dir /tmp/pink-demo --runtime cli
+create-mvp "an extension that makes all websites pink" --dir /tmp/pink-demo --runtime cli
 ```
 
 No Makefile authored, no plan written, no component list — one sentence in,

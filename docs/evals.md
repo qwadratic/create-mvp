@@ -1,6 +1,6 @@
 # Evals: how agent output gets verified
 
-Agents lie confidently, so nothing in an agentmake pipeline counts as done
+Agents lie confidently, so nothing in a create-mvp pipeline counts as done
 until a mechanical check says so. All eval tools live in [`evals/`](../evals/)
 and share one design: exit code is the verdict, so any of them can sit on a
 recipe line and gate a target (a failing check fails the recipe, and

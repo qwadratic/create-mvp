@@ -1,4 +1,4 @@
-# agentmake root — convenience targets only. The engine is engine/build.mk.
+# create-mvp root — convenience targets only. The engine is engine/build.mk.
 # Default work queue: the Backlog.md board (engine/board.mk) — make board-next.
 DEMO ?= game-of-life
 

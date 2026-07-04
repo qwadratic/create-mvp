@@ -100,8 +100,8 @@ hand.
 with the artifact census and the dependency graph:
 
 ```sh
-make demo                  # wipes + rebuilds demos/game-of-life from its 33-byte goal
-make demo DEMO=twitter-x   # pick a bigger one — the hero gif above is the game-of-life run
+make demo                  # wipes + rebuilds demos/game-of-life (the hero gif above) from its 33-byte goal
+make demo DEMO=twitter-x   # pick a bigger one
 ```
 
 Hacking on the *engine*? `make demo-mock` runs the full pipeline — classify →
@@ -281,11 +281,11 @@ make approve-http-api           # records who/when/sha256 of what was approved
 
 ## Eating the dogfood
 
-We pointed the engine at its own repo — one ad-hoc `goal.md` per improvement.
-Both runs green: every `check.sh` passed, both reviews said `VERDICT: PASS`.
-Both were failures — the agents never found the real board two dirs up,
-invented their own board format, gate-passed their own fixtures; the other
-run left a stray `report.md` outside its run dir. Gates measure internal
+We pointed the engine at its own repo — two runs, one ad-hoc `goal.md` each.
+Both green: every `check.sh` passed, both reviews said `VERDICT: PASS`.
+Both were failures — one never found the real board two dirs up, invented
+its own board format, gate-passed its own fixtures; the other left a stray
+`report.md` outside its run dir. Gates measure internal
 consistency, not integration, and ad-hoc goal files carry no queue semantics —
 that's why the board above is the default. Mess committed verbatim under
 [`docs/dogfood/`](docs/dogfood/), dissected in

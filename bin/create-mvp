@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# cook — one-shot natural-language CLI over the agentmake engine.
+# create-mvp — one-shot natural-language CLI over the create-mvp engine.
 #
-#   cook "an extension that makes all websites pink"
+#   create-mvp "an extension that makes all websites pink"
 #
 # Sentence in, software out: slugs the goal into a project dir under cwd,
 # writes goal.md VERBATIM, drops the 3-line Makefile, runs the full pipeline
@@ -14,7 +14,7 @@
 # Trust boundary: the goal text. It lands in goal.md verbatim and NOWHERE
 # else — dir name goes through a [a-z0-9-] charset gate, and no part of the
 # sentence is ever interpolated into the Makefile or a shell line.
-# Self-checks: bin/selfcheck-cook.sh (mock runtime, includes injection attempt).
+# Self-checks: bin/selfcheck-create-mvp.sh (mock runtime, includes injection attempt).
 set -euo pipefail
 
 self=${BASH_SOURCE[0]}
@@ -24,14 +24,14 @@ while [ -L "$self" ]; do  # follow symlink installs (relative links included)
 done
 ROOT=$(cd "$(dirname "$self")/.." && pwd)
 
-die() { echo "cook: $*" >&2; exit 2; }
+die() { echo "create-mvp: $*" >&2; exit 2; }
 
 usage() {
   cat <<'EOF'
-usage: cook "goal text" [flags]         one-shot: scaffold + full pipeline
-       cook --resume [dir]              continue a stopped run where it left off
-       cook progress [dir]              census bar for a run dir
-       cook graph [dir]                 mermaid DAG for a run dir
+usage: create-mvp "goal text" [flags]         one-shot: scaffold + full pipeline
+       create-mvp --resume [dir]              continue a stopped run where it left off
+       create-mvp progress [dir]              census bar for a run dir
+       create-mvp graph [dir]                 mermaid DAG for a run dir
 
 flags:
   --dir DIR       project dir (default: ./<slug-of-goal>)
@@ -94,10 +94,10 @@ if [ "$BOARD" = 1 ]; then
   command -v backlog >/dev/null || die "backlog CLI not found (--board needs it)"
   backlog instructions overview >/dev/null  # board contract: overview before any task op
   title=$(printf '%s' "$GOAL" | head -n1 | cut -c1-72)
-  out=$(backlog task create "$title" -d "$GOAL" -l cook --plain)
+  out=$(backlog task create "$title" -d "$GOAL" -l create-mvp --plain)
   printf '%s\n' "$out"
   id=$(printf '%s\n' "$out" | grep -oE '[A-Za-z]+-[0-9]+' | head -1)
-  echo "cook: filed ${id:-task} — build it later: make board-task TASK=${id:-<id>}"
+  echo "create-mvp: filed ${id:-task} — build it later: make board-task TASK=${id:-<id>}"
   exit 0
 fi
 
@@ -106,9 +106,9 @@ if [ "$RESUME" = 1 ]; then
   [ -n "$DIR" ] || DIR=${GOAL:-.}   # --resume takes the positional as a DIR
   GOAL=''
   [ -f "$DIR/Makefile" ] && [ -f "$DIR/goal.md" ] || die "not a run dir (need Makefile + goal.md): $DIR"
-  echo "cook: resuming $DIR — $(head -n1 "$DIR/goal.md")"
+  echo "create-mvp: resuming $DIR — $(head -n1 "$DIR/goal.md")"
 else
-  [ -n "$GOAL" ] || die 'no goal — cook "a sentence describing the software"'
+  [ -n "$GOAL" ] || die 'no goal — create-mvp "a sentence describing the software"'
   if [ -z "$DIR" ]; then
     slug=$(slugify "$GOAL")
     [[ $slug =~ ^[a-z0-9][a-z0-9-]{0,63}$ ]] || die "goal yields no usable slug — pass --dir"
@@ -116,25 +116,25 @@ else
   fi
   if [ -f "$DIR/goal.md" ]; then
     if printf '%s\n' "$GOAL" | cmp -s - "$DIR/goal.md"; then
-      echo "cook: same goal already in $DIR — resuming (make picks up where it stopped)"
+      echo "create-mvp: same goal already in $DIR — resuming (make picks up where it stopped)"
     else
       die "$DIR exists with a DIFFERENT goal — pick another --dir or remove it"
     fi
   elif [ -d "$DIR" ] && [ -n "$(ls -A "$DIR" 2>/dev/null)" ]; then
-    die "$DIR exists and is not a cook run dir — refusing to write into it"
+    die "$DIR exists and is not a create-mvp run dir — refusing to write into it"
   else
     mkdir -p -- "$DIR"
     printf '%s\n' "$GOAL" > "$DIR/goal.md"   # verbatim — never interpolated anywhere
   fi
   # the 3-line Makefile ($ROOT is filesystem-derived, no user input)
   # ponytail: absolute engine path — run dir isn't relocatable; upgrade = --relative flag
-  [ -f "$DIR/Makefile" ] || printf '# cooked by agentmake\nGOAL ?= goal.md\ninclude %s/engine/build.mk\n' "$ROOT" > "$DIR/Makefile"
+  [ -f "$DIR/Makefile" ] || printf '# created by create-mvp\nGOAL ?= goal.md\ninclude %s/engine/build.mk\n' "$ROOT" > "$DIR/Makefile"
 fi
 
 mkdir -p "$DIR/build"
 if [ -n "$TIER" ]; then
   tier_row "$TIER" > "$DIR/build/effort.json"   # newer than goal.md -> classify skipped
-  echo "cook: classifier overridden — tier=$TIER"
+  echo "create-mvp: classifier overridden — tier=$TIER"
 fi
 
 # ── runtime wiring: mock swaps the whole agent adapter; cli/sdk ride the env
@@ -143,21 +143,21 @@ case $RT in
   mock)    MK+=(AGENT="$ROOT/engine/fixtures/mock-agent") ;;
   cli|sdk) export RUNTIME=$RT ;;
 esac
-LOG=$DIR/build/cook.log
+LOG=$DIR/build/create-mvp.log
 
 # ── --dry: classify + plan, then show what a full run would spend
 if [ "$DRY" = 1 ]; then
-  "${MK[@]}" -s build/plan.json >"$LOG" 2>&1 || { echo "cook: classify/plan failed — log tail:" >&2; tail -n 25 "$LOG" >&2; exit 1; }
+  "${MK[@]}" -s build/plan.json >"$LOG" 2>&1 || { echo "create-mvp: classify/plan failed — log tail:" >&2; tail -n 25 "$LOG" >&2; exit 1; }
   eff=$DIR/build/effort.json plan=$DIR/build/plan.json
   n=$(jq '.components|length' "$plan")
-  echo "cook --dry: $DIR (no build agents fired)"
+  echo "create-mvp --dry: $DIR (no build agents fired)"
   echo "posture: tier=$(jq -r .tier "$eff")  fanout=$(jq -r .fanout "$eff")  model=$(jq -r .model_hint "$eff")  thinking=$(jq -r .thinking "$eff")  review=$(jq -r .review_depth "$eff")"
   echo "cost:    2 agent calls spent (classify+plan); full run adds $n build + 1 review"
   echo "plan:"
   jq -r '.components[] | "  " + .id
          + (if (.kind//"leaf")=="composite" then "  [composite -> own subtree]" else "" end)
          + (if (.deps|length)>0 then "   <- " + (.deps|join(", ")) else "" end)' "$plan"
-  echo "build it: cook --resume $DIR"
+  echo "build it: create-mvp --resume $DIR"
   exit 0
 fi
 
@@ -196,23 +196,23 @@ draw() {
   fi
 }
 
-echo "cook: $DIR  (runtime=$RT, -j$JOBS)  log: $LOG"
+echo "create-mvp: $DIR  (runtime=$RT, -j$JOBS)  log: $LOG"
 "${MK[@]}" -j"$JOBS" all >"$LOG" 2>&1 &
 MPID=$!
-trap 'kill "$MPID" 2>/dev/null; echo "cook: interrupted — resume: cook --resume $DIR" >&2; exit 130' INT TERM
+trap 'kill "$MPID" 2>/dev/null; echo "create-mvp: interrupted — resume: create-mvp --resume $DIR" >&2; exit 130' INT TERM
 while kill -0 "$MPID" 2>/dev/null; do draw; sleep 1; done
 if wait "$MPID"; then st=0; else st=$?; fi
 trap - INT TERM
 draw
 if [ "$st" -ne 0 ]; then
-  echo "cook: pipeline failed (exit $st) — log tail:" >&2
+  echo "create-mvp: pipeline failed (exit $st) — log tail:" >&2
   tail -n 25 "$LOG" >&2
-  echo "cook: fix nothing, rerun: cook --resume $DIR  (gates deleted the bad artifact; make resumes)" >&2
+  echo "create-mvp: fix nothing, rerun: create-mvp --resume $DIR  (gates deleted the bad artifact; make resumes)" >&2
   exit "$st"
 fi
 
 # ── done: artifact census + mechanical score
-echo "cooked -> $DIR"
+echo "created -> $DIR"
 echo "  $DIR/goal.md"
 echo "  $DIR/build/plan.json"
 echo "  $DIR/build/report.md ($(grep -o 'VERDICT: [A-Z]*' "$DIR/build/report.md" | head -1))"

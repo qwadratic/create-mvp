@@ -254,6 +254,9 @@ rtk python3 demoscene/attn-proxy-check.py   # prints table, "OK: all invariants 
 Any change to §3 constants requires updating the check first (it is the
 formula's executable definition).
 
-ponytail: renderer itself not implemented here — this spec + sidecar contract
-+ validated formula is the deliverable. Ceiling: `attn` CLI as a small python
-(tokenizer already exists in stage0.py `next_token`; steal it).
+~~ponytail: renderer itself not implemented here.~~ Ceiling closed: `attn`
+CLI (this dir) implements both modes and matches this check exactly
+(`attn-selfcheck.py` asserts golden text + invariants + disclaimer in every
+mode). Remaining ceiling: `attn session --json` emits the §5 shape, while
+`attn-session.py` emits an extended superset that `mk-timeline.py` requires
+— two weight/tokenizer implementations to keep in sync (see backlog).

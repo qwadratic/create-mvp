@@ -4,7 +4,7 @@ title: Nested decomposition via recursive make
 status: Done
 assignee: []
 created_date: '2026-07-03 18:11'
-updated_date: '2026-07-03 22:21'
+updated_date: '2026-07-04 01:21'
 labels:
   - idea
 dependencies: []
@@ -34,6 +34,15 @@ Validation rerun at finalization: nested-selftest PASS (tree build, order, idemp
 
 Judge round (3 judges: make-correctness, trajectory-fitness, docs+hygiene): 2 rounds each. Round-1 criticals fixed in d9e190e (id charset allowlist ^[a-z0-9][a-z0-9-]{0,63}$ at plan gate + engine/subtree — plan ids splice into make+shell, trust boundary, not style) and 5e5c07e (spec/impl code-block sync + line-count staleness). Re-judge: make-correctness PASS on judge-built fixtures (jobserver -j4 real cross-subtree interleave, resume-at-depth exactly-1-rebuild, MAXDEPTH cap enforced in generated makefile text); trajectory-fitness PASS (composite boundary sensible, lazy sub-planning verified in buildlog order); docs+hygiene 10/10. Follow-ups filed: TASK-17 (mid-flight re-planning), TASK-18 (whole-tree census), TASK-19 (cross-subtree deps + artifact store).
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-04 01:21
+---
+Naming correction (2026-07-04): project renamed agentmake -> create-mvp (USER OVERRIDE, docs/naming.md). Body references to agentmake kept as recorded history.
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 

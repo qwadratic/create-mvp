@@ -5,7 +5,7 @@ status: Done
 assignee:
   - '@pi-fixer'
 created_date: '2026-07-03 18:20'
-updated_date: '2026-07-03 20:06'
+updated_date: '2026-07-04 01:21'
 labels: []
 dependencies: []
 references:
@@ -56,6 +56,15 @@ board-next run: all gates passed; artifacts in board/TASK-14/
 
 Self-host run 3 green end-to-end: make board-task TASK=TASK-14 -> 7 components (stub-agent, plan-gate, components-generator, engine-core-makefile, census-target, mermaid-target, e2e-check), dep-ordered -j2, every check.sh green, review VERDICT: PASS, census 10/10, wfcheck 32/32 (score 1). Artifacts committed under board/TASK-14/.
 <!-- SECTION:NOTES:END -->
+
+## Comments
+
+<!-- COMMENTS:BEGIN -->
+created: 2026-07-04 01:21
+---
+Naming correction (2026-07-04): project renamed agentmake -> create-mvp (USER OVERRIDE, docs/naming.md; repo qwadratic/create-mvp, CLI bin/create-mvp ex bin/cook). Task title/body kept as recorded history — the self-host run happened under the old name.
+---
+<!-- COMMENTS:END -->
 
 ## Final Summary
 

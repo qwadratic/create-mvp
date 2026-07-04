@@ -1,6 +1,6 @@
 #!/bin/bash
 # mock-agent — deterministic engine/agent stand-in, ZERO LLM calls.
-# Same contract: classify <goal> | plan <goal> | build <id> | review
+# Same contract: plan <goal> | build <id> | review (tier role is deterministic, no mock needed)
 #
 # Fixture DAG (nested-selftest): root = leaf-one, leaf-two(dep leaf-one),
 # comp(composite, dep leaf-one) → sub-a, sub-b(dep sub-a), sub-c(dep sub-b).
@@ -17,10 +17,6 @@ log() { if [ -n "${MOCK_LOG:-}" ]; then echo "$*" >> "$MOCK_LOG"; fi; }
 
 role=$1; shift
 case $role in
-  classify)
-    log "classify d=${AGENTMAKE_DEPTH:-?} max=${MAXTIER:-unset}"
-    echo '{"tier":"standard","fanout":"3-5","review_depth":"standard","model_hint":"default","thinking":"medium"}'
-    ;;
   plan)
     log "plan d=${AGENTMAKE_DEPTH:-?}"
     if [ -n "${MOCK_BAD_ID:-}" ]; then

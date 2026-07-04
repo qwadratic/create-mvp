@@ -5,7 +5,7 @@
 #
 # Sentence in, software out: slugs the goal into a project dir under cwd,
 # writes goal.md VERBATIM, drops the 3-line Makefile, runs the full pipeline
-# (classify → plan → build agents → review) with a live progress bar, exits
+# (plan → build agents → review) with a live progress bar, exits
 # with artifact paths + the run's wfcheck score.
 #
 # Orchestration only — zero new engine logic. Everything shells to
@@ -35,8 +35,8 @@ usage: create-mvp "goal text" [flags]         one-shot: scaffold + full pipeline
 
 flags:
   --dir DIR       project dir (default: ./<slug-of-goal>)
-  --dry           classify + plan only; print component tree + cost posture
-  --tier T        override the classifier: vague | standard | prd
+  --dry           plan only; print component tree + cost posture
+  --budget B      effort budget: s | m | l (default m; also accepts vague|standard|prd)
   --runtime R     cli (default) | sdk | mock   (mock = engine-dev stub, zero LLM calls)
   --board         don't build: file the goal as a Backlog.md task instead
   --jobs N        make -jN fan-out (default 2)
@@ -60,7 +60,7 @@ while [ $# -gt 0 ]; do
   case $1 in
     --dir)     [ $# -ge 2 ] || die "--dir needs a value"; DIR=$2; shift 2 ;;
     --dry)     DRY=1; shift ;;
-    --tier)    [ $# -ge 2 ] || die "--tier needs a value"; TIER=$2; shift 2 ;;
+    --budget|--tier) [ $# -ge 2 ] || die "$1 needs a value"; TIER=$2; shift 2 ;;  # --tier = compat alias
     --runtime) [ $# -ge 2 ] || die "--runtime needs a value"; RT=$2; shift 2 ;;
     --board)   BOARD=1; shift ;;
     --resume)  RESUME=1; shift ;;
@@ -74,7 +74,11 @@ done
 
 # flag validation (flags are operator input, still gated: they reach make lines)
 case $RT in cli|sdk|mock) ;; *) die "--runtime must be cli|sdk|mock, got: $RT" ;; esac
-[ -z "$TIER" ] || case $TIER in vague|standard|prd) ;; *) die "--tier must be vague|standard|prd, got: $TIER" ;; esac
+case $TIER in
+  s) TIER=vague ;; m|'') TIER=standard ;; l) TIER=prd ;;   # s/m/l → canonical rows
+  vague|standard|prd) ;;
+  *) die "--budget must be s|m|l (or vague|standard|prd), got: $TIER" ;;
+esac
 case $JOBS in ''|*[!0-9]*) die "--jobs must be a number, got: $JOBS" ;; esac
 
 slugify() {  # goal text -> dir-safe [a-z0-9-]; the charset gate IS the injection gate
@@ -82,14 +86,6 @@ slugify() {  # goal text -> dir-safe [a-z0-9-]; the charset gate IS the injectio
   s=$(printf '%s' "$1" | LC_ALL=C tr '[:upper:]' '[:lower:]' | LC_ALL=C tr -c 'a-z0-9' '-' | LC_ALL=C tr -s '-')
   s=${s#-}; s=${s%-}; s=${s:0:48}; s=${s%-}
   printf '%s' "$s"
-}
-
-tier_row() {  # canonical knob rows — same table as engine/agent classify
-  case $1 in
-    vague)    echo '{"tier":"vague","fanout":"2-3","review_depth":"smoke","model_hint":"small","thinking":"low"}' ;;
-    standard) echo '{"tier":"standard","fanout":"3-5","review_depth":"standard","model_hint":"default","thinking":"medium"}' ;;
-    prd)      echo '{"tier":"prd","fanout":"5-8","review_depth":"full","model_hint":"large","thinking":"high"}' ;;
-  esac
 }
 
 # ── --board: "later" — file the goal on the Backlog.md board instead of building
@@ -136,13 +132,10 @@ else
 fi
 
 mkdir -p "$DIR/build"
-if [ -n "$TIER" ]; then
-  tier_row "$TIER" > "$DIR/build/effort.json"   # newer than goal.md -> classify skipped
-  echo "create-mvp: classifier overridden — tier=$TIER"
-fi
+echo "create-mvp: budget tier=$TIER"
 
 # ── runtime wiring: mock swaps the whole agent adapter; cli/sdk ride the env
-MK=(make -C "$DIR")
+MK=(make -C "$DIR" TIER="$TIER")
 case $RT in
   mock)    MK+=(AGENT="$ROOT/engine/fixtures/mock-agent") ;;
   cli|sdk) export RUNTIME=$RT ;;
@@ -159,14 +152,14 @@ if [ "$RT" = cli ]; then
 fi
 LOG=$DIR/build/create-mvp.log
 
-# ── --dry: classify + plan, then show what a full run would spend
+# ── --dry: plan only, then show what a full run would spend
 if [ "$DRY" = 1 ]; then
-  "${MK[@]}" -s build/plan.json >"$LOG" 2>&1 || { echo "create-mvp: classify/plan failed — log tail:" >&2; tail -n 25 "$LOG" >&2; exit 1; }
+  "${MK[@]}" -s build/plan.json >"$LOG" 2>&1 || { echo "create-mvp: plan failed — log tail:" >&2; tail -n 25 "$LOG" >&2; exit 1; }
   eff=$DIR/build/effort.json plan=$DIR/build/plan.json
   n=$(jq '.components|length' "$plan")
   echo "create-mvp --dry: $DIR (no build agents fired)"
   echo "posture: tier=$(jq -r .tier "$eff")  fanout=$(jq -r .fanout "$eff")  model=$(jq -r .model_hint "$eff")  thinking=$(jq -r .thinking "$eff")  review=$(jq -r .review_depth "$eff")"
-  echo "cost:    2 agent calls spent (classify+plan); full run adds $n build + 1 review"
+  echo "cost:    1 agent call spent (plan); full run adds $n build + 1 review"
   echo "plan:"
   jq -r '.components[] | "  " + .id
          + (if (.kind//"leaf")=="composite" then "  [composite -> own subtree]" else "" end)
@@ -181,9 +174,9 @@ LAST=0 PREV=''
 draw() {
   local b="$DIR/build" rows done=0 total=3 ids='' id n pct bar=''
   if [ -s "$b/effort.json" ]; then
-    rows=" ✓ classify   tier=$(jq -r .tier "$b/effort.json" 2>/dev/null || echo '?')"; done=1
+    rows=" ✓ budget     tier=$(jq -r .tier "$b/effort.json" 2>/dev/null || echo '?')"; done=1
   else
-    rows=" · classify"
+    rows=" · budget"
   fi
   [ -s "$b/plan.json" ] && ids=$(jq -r '.components[].id' "$b/plan.json" 2>/dev/null || true)
   if [ -n "$ids" ]; then

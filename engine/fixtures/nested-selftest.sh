@@ -11,7 +11,7 @@
 #      absent → resume rebuilds only the failed leaf + downstream
 #   5. depth cap: AGENTMAKE_MAXDEPTH=0 forces composite → leaf (no scaffold)
 #   6. MAXFANOUT gate: plan wider than cap rejected, plan.json deleted
-#   7. MAXTIER clamp: stub prd classifier under MAXTIER=vague → vague row
+#   7. MAXTIER clamp: TIER=prd under MAXTIER=vague → vague row (build.mk rule)
 #   8. observability: wfcheck recursion, progress/graph subtree rendering
 #   9. id charset gate: metachar/traversal/non-kebab ids rejected (plan gate
 #      + subtree helper) — ids splice into make+shell, LLM = trust boundary
@@ -58,14 +58,13 @@ grep -q '^VERDICT: PASS$' "$P/src/comp/build/report.md" || fail "subtree verdict
 # the composite itself is recursed, never handed to the build role.
 [ "$(grep -c '^build '    "$MOCK_LOG")" -eq 5 ] || fail "expected 5 leaf builds, got $(grep -c '^build ' "$MOCK_LOG")"
 [ "$(grep -c '^plan '     "$MOCK_LOG")" -eq 2 ] || fail "expected 2 plans (root + subtree)"
-[ "$(grep -c '^classify ' "$MOCK_LOG")" -eq 2 ] || fail "expected 2 classifies"
 [ "$(grep -c '^review '   "$MOCK_LOG")" -eq 2 ] || fail "expected 2 reviews"
 
 # depth + tier ceiling ride the $(MAKE) command line into the child
 grep -q '^plan d=0$' "$MOCK_LOG" || fail "root plan not at depth 0"
 grep -q '^plan d=1$' "$MOCK_LOG" || fail "subtree plan not at depth 1"
-grep -q '^classify d=0 max=prd$' "$MOCK_LOG"      || fail "root MAXTIER != prd default"
-grep -q '^classify d=1 max=standard$' "$MOCK_LOG" || fail "child MAXTIER != parent tier (standard)"
+jq -e '.tier=="standard"' "$P/build/effort.json" > /dev/null || fail "root tier != standard default"
+jq -e '.tier=="standard"' "$P/src/comp/build/effort.json" > /dev/null || fail "child did not inherit parent tier"
 
 # ── 2. idempotent rerun: zero agent calls, zero mtime churn
 snapshot() {
@@ -132,18 +131,16 @@ make -C "$P4" MAXFANOUT=2 all > "$TMP/run4.log" 2>&1 \
   && fail "MAXFANOUT=2 not enforced against 3-component plan"
 [ ! -f "$P4/build/plan.json" ] || fail "plan.json survived failed fanout gate (.DELETE_ON_ERROR)"
 
-# ── 7. MAXTIER clamp (engine/agent classify): stub prd classifier, vague ceiling
-STUB=$TMP/stub; mkdir -p "$STUB" "$TMP/clamp"
-printf '#!/bin/bash\necho '\''{"tier":"prd","fanout":"5-8","review_depth":"full","model_hint":"large","thinking":"high"}'\''\n' > "$STUB/pi"
-chmod +x "$STUB/pi"
-echo 'goal' > "$TMP/clamp/goal.md"
-# ENGINE_CLI=pi pinned: the stub classifier on PATH is named `pi` (engine default is claude)
-out=$(cd "$TMP/clamp" && PATH="$STUB:$PATH" ENGINE_CLI=pi MAXTIER=vague "$ENGINE/agent" classify goal.md)
-echo "$out" | jq -e '.tier=="vague" and .fanout=="2-3" and .review_depth=="smoke" and .model_hint=="small" and .thinking=="low"' > /dev/null \
-  || fail "MAXTIER=vague clamp: expected whole vague row, got: $out"
-out=$(cd "$TMP/clamp" && PATH="$STUB:$PATH" ENGINE_CLI=pi MAXTIER=prd "$ENGINE/agent" classify goal.md)
-echo "$out" | jq -e '.tier=="prd" and .thinking=="high"' > /dev/null \
-  || fail "MAXTIER=prd clamp altered an in-bounds row: $out"
+# ── 7. MAXTIER clamp (build.mk effort rule): TIER=prd under MAXTIER=vague → vague row
+mkdir -p "$TMP/clamp"; echo 'goal' > "$TMP/clamp/goal.md"
+printf 'GOAL=goal.md\nB=build\nSRC=src\nAGENT=%s\ninclude %s\n' "$AGENT" "$ENGINE/build.mk" > "$TMP/clamp/Makefile"
+( cd "$TMP/clamp" && make -s TIER=prd MAXTIER=vague build/effort.json )
+jq -e '.tier=="vague" and .fanout=="2-3" and .review_depth=="smoke" and .model_hint=="small" and .thinking=="low"' "$TMP/clamp/build/effort.json" > /dev/null \
+  || fail "MAXTIER=vague clamp: expected whole vague row, got: $(cat "$TMP/clamp/build/effort.json")"
+rm -rf "$TMP/clamp/build"
+( cd "$TMP/clamp" && make -s TIER=prd MAXTIER=prd build/effort.json )
+jq -e '.tier=="prd" and .thinking=="high"' "$TMP/clamp/build/effort.json" > /dev/null \
+  || fail "MAXTIER=prd clamp altered an in-bounds row: $(cat "$TMP/clamp/build/effort.json")"
 
 # ── 8. observability over the nested run
 "$EVALS/wfcheck" "$P" > /dev/null || fail "wfcheck failed on good nested run"

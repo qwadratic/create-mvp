@@ -12,3 +12,5 @@ demos/tui-habits/habits.json
 evals/matrix-runs/*/.sessions/
 __pycache__/
 *.pyc
+# demoscene render products (mp4/gif/pgm build outputs, regenerate via mk-*.py)
+demoscene/out/

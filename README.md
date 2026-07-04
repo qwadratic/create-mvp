@@ -10,25 +10,27 @@ one agent. No orchestrator daemon, no framework: the engine is
 
 ![the engine, live](media/engine-run.gif)
 
-*Unedited rebuild of `demos/game-of-life` — `make clean && make -j2`: classify
-→ plan → three build agents → review gate, then `make progress` and
+*Unedited rebuild of `demos/game-of-life` — `make clean && make -j2`: plan
+→ three build agents → review gate, then `make progress` and
 `make graph`. Idle time capped at 2s (`asciinema rec -i 2`), so agent thinking
-pauses are compressed; nothing else is. Cast:
+pauses are compressed; nothing else is. One anachronism: the cast's `classify`
+line — that agent call is now the explicit `--budget` knob (next section);
+everything downstream is current. Cast:
 [`media/engine-run.cast`](media/engine-run.cast).*
 
-## You get what you ask for
+## You get what you dial
 
-Phase 0 of every run classifies *your* effort. A one-liner gets a small, cheap
-swarm and a smoke review; a full PRD gets a wide fan-out, a big model, and a
-reviewer that checks every acceptance criterion. Same command either way —
-the prompt is the budget dial.
+Effort is an explicit knob, not an inference: `--budget s|m|l` (default `m`).
+Small buys a cheap swarm and a smoke review; `l` buys wide fan-out, a big
+model, and a reviewer that checks every acceptance criterion. Same command
+either way — the flag is the budget dial, the prompt is the spec.
 
 | <img src="media/game-of-life.gif" width="380"> | <img src="media/twitter-x.gif" width="380"> |
 |---|---|
 | **33 bytes**: ["game of life, make it look alive"](demos/game-of-life/goal.md) | [**5.4 KB PRD**](demos/twitter-x/goal.md): X clone, 3 load-balanced backends |
 
-33 bytes bought 3 agents and a smoke check; 5.4 KB bought 7 agents and a
-full-rubric reviewer. Tier mechanics:
+The 33-byte goal ran at small budget — 3 agents, a smoke check; the 5.4 KB
+PRD ran at `l` — 7 agents, a full-rubric reviewer. Knob table + mechanics:
 [docs/effort-and-hitl.md](docs/effort-and-hitl.md).
 
 All six demos were built by the engine from the goal file shown, unedited:
@@ -69,7 +71,7 @@ progress bar; it exits with the artifact paths and the run's
 see [Runtime](#runtime).
 
 ```
- ✓ classify   tier=vague
+ ✓ budget     tier=standard
  ✓ plan       3 components
  ✓ pink-css
  ✓ manifest
@@ -80,8 +82,8 @@ see [Runtime](#runtime).
 
 | | |
 |---|---|
-| `--dry` | classify + plan only — prints the component tree and the cost posture (2 agent calls, zero builds) |
-| `--tier vague\|standard\|prd` | override the classifier — the budget dial, by hand |
+| `--dry` | plan only — prints the component tree and the cost posture (one agent call, zero builds) |
+| `--budget s\|m\|l` | the effort dial (default `m`); long names `vague\|standard\|prd` and `--tier` still accepted |
 | `--runtime cli\|sdk\|mock` | agent harness; `mock` = engine-dev stub, full pipeline, zero LLM calls |
 | `--board` | don't build now — file the goal as a Backlog.md task (`make board-task` later) |
 | `--resume <dir>` | continue a stopped or failed run exactly where it left off (plain `make` resume) |
@@ -104,8 +106,8 @@ make demo                  # wipes + rebuilds demos/game-of-life (the hero gif a
 make demo DEMO=twitter-x   # pick a bigger one
 ```
 
-Hacking on the *engine*? `make demo-mock` runs the full pipeline — classify →
-plan → parallel builds → review gate, one composite subtree included — with
+Hacking on the *engine*? `make demo-mock` runs the full pipeline — plan →
+parallel builds → review gate, one composite subtree included — with
 [a 60-line bash stub](engine/fixtures/mock-agent) as the LLM: ~1s, zero
 tokens. Ends with the census, the mermaid graph, and a `wfcheck` grade
 (17/17). Missing: agent thinking. The DAG, gates, and resume semantics are
@@ -125,8 +127,8 @@ make -j4
 ## How it works
 
 ```
-goal.md ──▶ classify ──▶ effort.json     (jq schema gate)
-        ──▶ plan ──────▶ plan.json       (jq: components > 0)
+--budget ─▶ effort.json                  (knob row via jq, schema gate)
+goal.md ──▶ plan ──────▶ plan.json       (jq: components > 0)
                  jq -r ▶ components.mk   (make re-includes itself, DAG restart)
                          one build agent per component, dep-ordered, -j parallel
                          each gated by its own src/<id>/check.sh
@@ -164,7 +166,7 @@ graph TD
 **And it recurses.** A plan component may be `"kind": "composite"` with its
 own `sub_goal`: the same `jq -r` line emits a `+$(MAKE) -C src/<id>` recursion
 instead of a build agent, and the subtree runs this same engine file — own
-classify, own plan, own swarm, own review, its verdict bubbling up as the
+plan, own swarm, own review, its verdict bubbling up as the
 parent's `.done`. Planning stays lazy (a subtree is planned when its turn
 comes), and the bounds are deterministic jq/make, not prompt trust: a depth
 cap (`AGENTMAKE_MAXDEPTH`, default 3) forces leaves at the cap, the subtree's
@@ -192,7 +194,7 @@ make ENGINE_CLI=gemini         # gemini / opencode presets (unverified locally)
 ENGINE_CLI=custom ENGINE_CLI_CUSTOM='mycli --oneshot {prompt}' make  # any CLI
 make RUNTIME=sdk               # in-process pi SDK (engine/runtime-sdk.mjs)
 ENGINE_CLI_FLAGS="--model x" make    # passthrough flags
-MODEL_SMALL=... MODEL_LARGE=... make # what the classifier's model hints resolve to
+MODEL_SMALL=... MODEL_LARGE=... make # what the tier's model hints resolve to
 ```
 
 | ENGINE_CLI | invocation | system-prompt mechanism | tested here |

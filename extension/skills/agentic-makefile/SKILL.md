@@ -40,7 +40,7 @@ exactly where it stopped.
    `build/` artifacts, sharpen `goal.md`, rerun. Last resort: `make clean`
    (wipes `build/` and `src/`).
 
-## Effort classifier
+## Effort triage (engine or not)
 
 | class | signal | route |
 |-------|--------|-------|

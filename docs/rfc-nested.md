@@ -4,6 +4,11 @@ Status: adjudicated spec (dueling-designs round, TASK-11). Supersedes and
 replaces scratch RFCs nested-A (recursive make) and nested-B
 (flatten-at-generate).
 
+> Post-implementation note: the per-subtree classify *agent* described below
+> was later replaced by an explicit `TIER` param (`--budget`); the MAXTIER
+> clamp survives as a deterministic jq rule in `engine/build.mk`. §5b/§6
+> record the agent-era mechanics.
+
 ## Adjudication record
 
 **Winner: A (recursive make), with two grafts from B.**

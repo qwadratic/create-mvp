@@ -13,7 +13,7 @@
 #   pi/claude via --append-system-prompt; codex/gemini/opencode/custom have no
 #   append mechanism -> system.md prepended to the prompt with a delimiter.
 #
-# Effort knobs: $B/effort.json — written by `classify` role (goal-level), e.g.
+# Effort knobs: $B/effort.json — written by build.mk's TIER knob rule (deterministic jq), e.g.
 #   {"tier":"prd","fanout":"5-8","review_depth":"full","model_hint":"large","thinking":"high"}
 #   model_hint small/large → MODEL_SMALL/MODEL_LARGE env (unset → provider default)
 # Optional hand-authored per-unit overrides may coexist in the same file:

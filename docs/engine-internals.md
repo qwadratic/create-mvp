@@ -26,7 +26,7 @@ $(B)/plan.json: $(GOAL) $(B)/effort.json
 
 A failing `jq -e` fails the recipe, deletes `plan.json`, stops the pipeline —
 an invalid decomposition cannot leak downstream. The same pattern gates the
-effort classifier (schema check), every component (`check.sh`), and the final
+effort knob row (schema check), every component (`check.sh`), and the final
 review (`grep -q 'VERDICT: PASS'`).
 
 `okid` is a security gate, not a style check: component ids splice verbatim
@@ -52,7 +52,8 @@ $(B)/components.mk: $(B)/plan.json
 
 Fresh run: make parses, sees `components.mk` missing (`-` suppresses the
 error), finds its rule, which pulls in `plan.json`, which pulls in
-`effort.json`, which runs the classifier and planner agents. jq turns
+`effort.json` (deterministic jq from the `TIER` knob) and fires the planner
+agent. jq turns
 `plan.json` into makefile rules; make restarts with a DAG shaped exactly like
 the agent's decomposition. No templating engine, no codegen framework:
 `jq -r` printing text.
@@ -82,7 +83,7 @@ trivial (census below).
 
 ```make
 $(B)/effort.json: $(GOAL) | $(B)
-	$(AGENT) classify $< > $@
+	jq -cn --arg t "$(TIER)" --arg max "$(MAXTIER)" '…knob table…' > $@
 ```
 
 After `|` is an *order-only* prerequisite: `build/` must exist before the
@@ -142,8 +143,8 @@ deliberate: `make clean` (`rm -rf build/ src/`).
 One planning call cannot foresee a big build. So a plan component may declare
 `"kind": "composite"` with a `sub_goal`; instead of one giant agent session it
 becomes a *complete nested project* at `src/<id>/` — own `goal.md`, own
-three-line Makefile including the same `build.mk`, own classify → plan →
-build → review pipeline. Full design in [`rfc-nested.md`](rfc-nested.md); this
+three-line Makefile including the same `build.mk`, own plan → build →
+review pipeline (budget inherited from the parent). Full design in [`rfc-nested.md`](rfc-nested.md); this
 section covers the make machinery. A generated composite rule:
 
 ```make
@@ -193,8 +194,8 @@ it just means "the whole subtree" now.
 on an LLM obeying instructions. `AGENTMAKE_MAXDEPTH` (default 3): at the cap
 the jq template emits the leaf branch regardless of the planner — `desc`
 stays mandatory as the buildable fallback, so a composite-grade component
-still builds as one unit. `MAXTIER`: child classify output clamped to the
-parent's tier in `engine/agent` — the *whole* knob row, not just the tier
+still builds as one unit. `MAXTIER`: the child's `TIER` clamped to the
+parent's in the build.mk knob rule — the *whole* knob row, not just the tier
 string (a clamped tier keeping prd fanout and a large model would defeat the
 point) — effort monotone non-increasing down the tree. `MAXFANOUT` (default
 8): the plan gate rejects wider decompositions per level; tree bounded at

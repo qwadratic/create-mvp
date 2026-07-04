@@ -1,16 +1,20 @@
-# Effort classification and the human-in-the-loop switch
+# Effort budget and the human-in-the-loop switch
 
-Two control planes sit on top of the pipeline: an **effort classifier**
-scaling agent spend to how much the human invested in the goal, and a single
-**HITL switch** flipping any step between auto and human approval.
+Two control planes sit on top of the pipeline: an explicit **effort budget**
+scaling agent spend per run, and a single **HITL switch** flipping any step
+between auto and human approval.
 
-## Effort tiers: agent effort ∝ user effort
+## Effort tiers: the budget knob
 
-Phase 0 of every run is one cheap agent call: classify `goal.md`, write
-`build/effort.json`. The result is schema-gated with `jq -e` before anything
-else runs — a malformed classification kills the pipeline, not just warns.
+Phase 0 is deterministic — no agent call. `TIER` (`s|m|l`; long names
+`vague|standard|prd`; `create-mvp --budget`) selects a row from the knob
+table single-sourced in [`engine/build.mk`](../engine/build.mk), and a jq
+rule writes `build/effort.json`. The row is schema-gated with `jq -e` before
+anything else runs. An earlier revision classified the goal text with an
+agent; effort is a user knob now, not an inference — subtrees inherit the
+parent's tier as a ceiling (`MAXTIER` clamp, same jq rule).
 
-| tier | goal looks like | fanout | review_depth | model_hint | thinking |
+| tier | meant for | fanout | review_depth | model_hint | thinking |
 |---|---|---|---|---|---|
 | `vague` | one-liner, no constraints ("make me a todo app") | 2–3 | smoke | small | low |
 | `standard` | named features, tech constraints, rough structure | 3–5 | standard | default | medium |
@@ -30,8 +34,7 @@ Where each knob lands:
   verifies every acceptance criterion and makes evals mandatory (missing or
   failing evals = FAIL).
 
-The classifier's exact rubric:
-[`engine/prompts/classify.md`](../engine/prompts/classify.md); knob plumbing:
+Knob plumbing:
 [`engine/agent`](../engine/agent). `effort.json` also accepts hand-authored
 per-unit overrides (`units: {"plan": "high", "<component-id>": "low"}` plus a
 `tiers` map to models/thinking) to route one hard component to a bigger model

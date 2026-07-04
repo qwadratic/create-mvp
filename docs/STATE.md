@@ -44,14 +44,14 @@ record) are intentional and marked stale.
 
 | area | artifact | status |
 |---|---|---|
-| Engine core | [`engine/build.mk`](../engine/build.mk) (~120 lines): classify → plan → jq-generated `components.mk` (re-include restart) → per-component agents + `check.sh` gates → review gate; `.DELETE_ON_ERROR` resume | live-verified cold: fresh `/tmp` project, 2-line Makefile, full pipeline + rerun no-op |
+| Engine core | [`engine/build.mk`](../engine/build.mk) (~120 lines): budget knob → plan → jq-generated `components.mk` (re-include restart) → per-component agents + `check.sh` gates → review gate; `.DELETE_ON_ERROR` resume | live-verified cold: fresh `/tmp` project, 2-line Makefile, full pipeline + rerun no-op |
 | Nested decomposition | [`docs/rfc-nested.md`](rfc-nested.md): composite components → [`engine/subtree`](../engine/subtree) scaffold + recursive `$(MAKE) -C`; deterministic bounds (MAXDEPTH 3, MAXTIER clamp, MAXFANOUT 8) + id/dep charset allowlist (ids splice into make+shell — trust boundary) in jq/make; progress/graph/wfcheck recurse, flat runs byte-identical | mock-first zero-LLM e2e (`engine/fixtures/nested-selftest.sh`) + live real-PRD run (site-forge) |
 | Board integration | [`engine/board.mk`](../engine/board.mk): Backlog.md = default work queue; `board` / `board-next` / `board-task`; failed gate leaves task In Progress | verified e2e — TASK-14 pulled → Done via CLI |
 | Self-host proof | [`docs/self-host-run/`](self-host-run/) — engine built itself from the board, 7 components, wfcheck 32/32 | committed run artifacts |
 | Agent adapter | [`engine/agent`](../engine/agent): roles plan/build/review; `RUNTIME=cli\|sdk`, `ENGINE_CLI=claude(default)\|pi\|codex\|gemini\|opencode\|custom`, `ENGINE_CLI_FLAGS` passthrough; per-unit `effort.json` model routing; argv golden (`engine/selfcheck-argv.sh`, 12/12); per-agent e2e status: [`evals/runtime-matrix.md`](../evals/runtime-matrix.md) | pi e2e-proven (full build, wfcheck 16/16, 0 retries) + sdk live-verified; claude reaches auth boundary only (TASK-16); codex flags verified vs local `--help`, e2e blocked (credits); gemini/opencode UNVERIFIED-LOCALLY |
 | Style injection | [`engine/prompts/system.md`](../engine/prompts/system.md) (caveman+ponytail) injected at the single `run()` chokepoint, both runtimes | judge-verified, no bypass path |
 | Evals | [`evals/`](../evals/): `snap` (~0.2s/shot), `evalshot` (SSIM golden), `apieval` (jq+TOON golden), `wfcheck` (whole-run grade), `matrix` (multi-model); TUI tmux-golden recipe | selftests green; apieval wired live in twitter-x `run.sh --check` |
-| Effort tiers | classify gate: vague/standard/prd → fan-out, review depth, model hint, thinking | [`docs/effort-and-hitl.md`](effort-and-hitl.md) |
+| Effort tiers | explicit TIER knob (s\|m\|l → vague/standard/prd rows, deterministic jq, schema-gated) → fan-out, review depth, model hint, thinking | [`docs/effort-and-hitl.md`](effort-and-hitl.md) |
 | HITL design | approval-file gates (`build/approvals/<step>.ok`, timestamp staleness re-opens) | designed + documented, NOT wired by default (TASK-2) |
 | pi extension | [`extension/index.ts`](../extension/index.ts): built-ins disabled, single `create_mvp_demo` tool, `/demo` command, bundled `agentic-makefile` skill | judge-verified present |
 | Dogfood narrative | [`docs/dogfood-autopsy.md`](dogfood-autopsy.md) + committed mess dirs (`dogfood-*/`) + README "Eating the dogfood" | STEERING arc complete |
@@ -68,7 +68,7 @@ at build time, *after* its dependencies exist, so reality informs the plan.
 B replaces one blind upfront plan with N blind upfront plans (same failure
 mode, more calls); B's own rejected variant B2 proved lazy planning is
 structurally impossible inside a single make instance. Two grafts from B
-close A's worst cons: MAXTIER clamp (subtree classify ≤ parent tier) and
+close A's worst cons: MAXTIER clamp (subtree tier ≤ parent tier) and
 per-level MAXFANOUT gate.
 
 **Deterministic bounds, all jq/make — never prompt trust:** `AGENTMAKE_MAXDEPTH`
